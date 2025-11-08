@@ -3,6 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Target, LogOut, TrendingUp, Award, Clock } from "lucide-react";
 import googleLogo from "@/assets/google-logo.png";
 import microsoftLogo from "@/assets/microsoft-logo.png";
+import amazonLogo from "@/assets/amazon-logo.png";
 const companies = [{
   id: 1,
   name: "Google",
@@ -21,8 +22,9 @@ const companies = [{
   id: 3,
   name: "Amazon",
   role: "Cloud Engineer",
-  logo: "📦",
-  color: "from-orange-500 to-orange-600"
+  logo: amazonLogo,
+  color: "bg-white",
+  isImage: true
 }, {
   id: 4,
   name: "Apple",
