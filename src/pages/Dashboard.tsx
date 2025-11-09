@@ -4,6 +4,7 @@ import { Target, LogOut, TrendingUp, Award, Clock } from "lucide-react";
 import googleLogo from "@/assets/google-logo.png";
 import microsoftLogo from "@/assets/microsoft-logo.png";
 import amazonLogo from "@/assets/amazon-logo.png";
+import appleLogo from "@/assets/apple-logo.png";
 const companies = [{
   id: 1,
   name: "Google",
@@ -29,8 +30,9 @@ const companies = [{
   id: 4,
   name: "Apple",
   role: "iOS Developer",
-  logo: "🍎",
-  color: "from-gray-700 to-gray-800"
+  logo: appleLogo,
+  color: "bg-white",
+  isImage: true
 }, {
   id: 5,
   name: "Meta",
