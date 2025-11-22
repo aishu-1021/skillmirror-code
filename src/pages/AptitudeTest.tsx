@@ -3,8 +3,11 @@ import { useParams, useNavigate, Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { Card } from "@/components/ui/card";
-import { Target, Clock, ChevronLeft, ChevronRight, Flag } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Target, Clock, ChevronLeft, ChevronRight, Flag, Mail } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { supabase } from "@/integrations/supabase/client";
 
 const aptitudeQuestions = [
   {
@@ -198,6 +201,9 @@ const AptitudeTest = () => {
   const [answers, setAnswers] = useState<(number | null)[]>(new Array(30).fill(null));
   const [timeLeft, setTimeLeft] = useState(40 * 60); // 40 minutes in seconds
   const [isSubmitted, setIsSubmitted] = useState(false);
+  const [email, setEmail] = useState("");
+  const [testStarted, setTestStarted] = useState(false);
+  const [isSendingEmail, setIsSendingEmail] = useState(false);
 
   const companyName = companyId ? decodeURIComponent(companyId) : "Company";
 
@@ -242,7 +248,42 @@ const AptitudeTest = () => {
     }
   };
 
-  const handleSubmit = () => {
+  const analyzeWeakAreas = () => {
+    const questionCategories: { [key: string]: number[] } = {
+      "Speed and Distance": [0, 6],
+      "Percentage and Profit": [1, 3, 15, 23],
+      "Basic Algebra": [2, 8, 26],
+      "Number Series": [4, 12, 24],
+      "Ratio and Proportion": [5, 18],
+      "Average": [7],
+      "Simple and Compound Interest": [13, 17],
+      "Geometry": [14, 25, 29],
+      "Time and Work": [19, 21],
+      "Probability": [22, 28],
+      "Cisterns and Pipes": [16],
+      "Squares and Powers": [27],
+      "Sum of Natural Numbers": [20],
+    };
+
+    const weakCategories: string[] = [];
+    
+    Object.entries(questionCategories).forEach(([category, questionIndices]) => {
+      let wrongCount = 0;
+      questionIndices.forEach(index => {
+        if (answers[index] !== aptitudeQuestions[index].correctAnswer) {
+          wrongCount++;
+        }
+      });
+      
+      if (wrongCount > 0) {
+        weakCategories.push(`${category} (${wrongCount}/${questionIndices.length} incorrect)`);
+      }
+    });
+
+    return weakCategories.length > 0 ? weakCategories : ["General aptitude concepts"];
+  };
+
+  const handleSubmit = async () => {
     const answeredCount = answers.filter(a => a !== null).length;
     let correctCount = 0;
     
@@ -252,17 +293,122 @@ const AptitudeTest = () => {
       }
     });
 
-    const percentage = ((correctCount / aptitudeQuestions.length) * 100).toFixed(1);
+    const percentage = (correctCount / aptitudeQuestions.length) * 100;
 
     setIsSubmitted(true);
+    setIsSendingEmail(true);
+
     toast({
       title: "Test Submitted!",
-      description: `You scored ${correctCount}/${aptitudeQuestions.length} (${percentage}%)`,
+      description: `You scored ${correctCount}/${aptitudeQuestions.length} (${percentage.toFixed(1)}%)`,
     });
+
+    try {
+      const weakAreas = analyzeWeakAreas();
+      
+      const { data, error } = await supabase.functions.invoke('send-test-result', {
+        body: {
+          email,
+          companyName,
+          score: correctCount,
+          totalQuestions: aptitudeQuestions.length,
+          percentage,
+          weakAreas
+        }
+      });
+
+      if (error) throw error;
+
+      toast({
+        title: "Email Sent!",
+        description: "Check your inbox for detailed test results and feedback.",
+      });
+    } catch (error) {
+      console.error("Error sending email:", error);
+      toast({
+        title: "Email Failed",
+        description: "Results were saved but email couldn't be sent. Please contact support.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsSendingEmail(false);
+    }
   };
 
   const answeredCount = answers.filter(a => a !== null).length;
   const progress = (answeredCount / aptitudeQuestions.length) * 100;
+
+  // Email collection screen before test starts
+  if (!testStarted) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center p-4">
+        <Card className="max-w-md w-full p-8">
+          <div className="mb-6 text-center">
+            <div className="h-16 w-16 rounded-full bg-primary/10 flex items-center justify-center mx-auto mb-4">
+              <Mail className="h-8 w-8 text-primary" />
+            </div>
+            <h1 className="text-2xl font-bold mb-2">Before You Start</h1>
+            <p className="text-muted-foreground">
+              {companyName} - Aptitude Test
+            </p>
+          </div>
+
+          <div className="space-y-4">
+            <div>
+              <Label htmlFor="email">Email Address</Label>
+              <Input
+                id="email"
+                type="email"
+                placeholder="your.email@example.com"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                className="mt-1"
+              />
+              <p className="text-sm text-muted-foreground mt-2">
+                We'll send your test results and personalized feedback to this email.
+              </p>
+            </div>
+
+            <div className="bg-muted p-4 rounded-lg space-y-2">
+              <h3 className="font-semibold">Test Details:</h3>
+              <ul className="text-sm space-y-1">
+                <li>• 30 questions</li>
+                <li>• 40 minutes duration</li>
+                <li>• 75% passing score</li>
+                <li>• Detailed feedback via email</li>
+              </ul>
+            </div>
+
+            <Button
+              onClick={() => {
+                if (!email || !email.includes('@')) {
+                  toast({
+                    title: "Invalid Email",
+                    description: "Please enter a valid email address.",
+                    variant: "destructive",
+                  });
+                  return;
+                }
+                setTestStarted(true);
+              }}
+              className="w-full"
+              size="lg"
+            >
+              Start Test
+            </Button>
+
+            <Button
+              onClick={() => navigate("/dashboard")}
+              variant="outline"
+              className="w-full"
+            >
+              Back to Dashboard
+            </Button>
+          </div>
+        </Card>
+      </div>
+    );
+  }
 
   if (isSubmitted) {
     const correctCount = answers.filter((answer, index) => 
@@ -297,6 +443,12 @@ const AptitudeTest = () => {
               </div>
             </div>
           </div>
+
+          {isSendingEmail && (
+            <div className="mb-6 p-4 bg-blue-50 border border-blue-200 rounded-lg text-center">
+              <p className="text-sm text-blue-700">Sending detailed results to {email}...</p>
+            </div>
+          )}
 
           <div className="flex gap-3 justify-center">
             <Button onClick={() => navigate("/dashboard")} variant="outline">
