@@ -8,7 +8,7 @@ import { useToast } from "@/hooks/use-toast";
 
 const Register = () => {
   const [formData, setFormData] = useState({
-    name: "",
+    fullName: "",
     email: "",
     password: "",
     confirmPassword: "",
@@ -24,7 +24,7 @@ const Register = () => {
 
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     if (formData.password !== formData.confirmPassword) {
       toast({
         title: "Passwords don't match",
@@ -35,16 +35,41 @@ const Register = () => {
     }
 
     setIsLoading(true);
-    
-    // Simulate registration - will be replaced with actual auth later
-    setTimeout(() => {
-      setIsLoading(false);
+
+    try {
+      const response = await fetch("http://localhost:8080/api/auth/register", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          fullName: formData.fullName,
+          email: formData.email,
+          college: formData.college,
+          password: formData.password,
+        }),
+      });
+
+      if (!response.ok) {
+        const msg = await response.text();
+        throw new Error(msg);
+      }
+
       toast({
         title: "Account created!",
-        description: "Welcome to SkillMirror. Let's start practicing.",
+        description: "You can now log in.",
       });
-      navigate("/dashboard");
-    }, 1000);
+
+      navigate("/login");
+    } catch (err: any) {
+      toast({
+        title: "Registration failed",
+        description: err.message || "Something went wrong",
+        variant: "destructive",
+      });
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (
@@ -67,11 +92,11 @@ const Register = () => {
             <div className="space-y-2">
               <Label htmlFor="name">Full Name</Label>
               <Input
-                id="name"
-                name="name"
+                id="fullName"
+                name="fullName"
                 type="text"
                 placeholder="John Doe"
-                value={formData.name}
+                value={formData.fullName}
                 onChange={handleChange}
                 required
                 className="h-11"

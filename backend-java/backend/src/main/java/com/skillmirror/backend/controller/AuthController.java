@@ -20,13 +20,16 @@ public class AuthController {
     @PostMapping("/register")
     public ResponseEntity<?> register(@RequestBody User user) {
 
+        if (user.getEmail() == null || user.getPassword() == null || user.getFullName() == null) {
+            return ResponseEntity.badRequest().body("Missing required fields");
+        }
         if (userRepository.findByEmail(user.getEmail()).isPresent()) {
             return ResponseEntity.badRequest().body("Email already exists");
         }
-
         userRepository.save(user);
         return ResponseEntity.ok("User registered successfully");
     }
+
 
     // LOGIN
     @PostMapping("/login")
