@@ -40,23 +40,23 @@ correctAnswer: 2
 id: 6,
 question: "Five friends sit in a row. A is left of B but right of C. D is right of B. Who sits in the middle?",
 options: ["A", "B", "C", "D"],
-correctAnswer: 2
-},
-{
-id: 7,
-question: "If MONDAY is written as NPOEBZ, how is FRIDAY written?",
-options: ["GSJEBZ", "GRIEDC", "GSHCBA", "GSJDCB"],
-correctAnswer: 1
-},
-{
-id: 8,
-question: "Which one does not belong?             Circle, Triangle, Square, Pentagon, Cube",
-options: ["Cube", "Triangle", "Pentagon", "Square"],
-correctAnswer: 1
-},
-{
-id: 9,
-question: "If 3 cats catch 3 mice in 3 minutes, how many mice will 100 cats catch in 100 minutes (assuming linearity)?",
+        correctAnswer: 2
+    },
+    {
+      id: 7,
+      question: "If MONDAY is written as NPOEBZ, how is FRIDAY written?",
+      options: ["GSJEBZ", "GRIEDC", "GSHCBA", "GSJDCB"],
+      correctAnswer: 1
+    },
+    {
+      id: 8,
+      question: "Which one does not belong?             Circle, Triangle, Square, Pentagon, Cube",
+      options: ["Cube", "Triangle", "Pentagon", "Square"],
+      correctAnswer: 1
+    },
+    {
+      id: 9,
+      question: "If 3 cats catch 3 mice in 3 minutes, how many mice will 100 cats catch in 100 minutes (assuming linearity)?",
       options: ["100", "300", "3333", "1000"],
       correctAnswer: 3
     },
@@ -209,7 +209,7 @@ question: "If 3 cats catch 3 mice in 3 minutes, how many mice will 100 cats catc
     {
       id: 4,
       question: "All servers in a cluster are Linux machines. Some Linux machines are container-optimized.",
-      conclusion: ["All servers are container-optimized", "Some servers might be container-optimized", " No servers are container-optimized", "Cannot be determined"],
+      options: ["All servers are container-optimized", "Some servers might be container-optimized", " No servers are container-optimized", "Cannot be determined"],
       correctAnswer: 2
     },
     {
@@ -391,7 +391,7 @@ question: "If 3 cats catch 3 mice in 3 minutes, how many mice will 100 cats catc
     {
       id: 4,
       question: "All backend services depend on a database. Some backend services also use caching.",
-      conclusion: ["All backend services use caching", "Some backend services may not use caching", "No backend services use caching", "None of the above"],
+      options: ["All backend services use caching", "Some backend services may not use caching", "No backend services use caching", "None of the above"],
       correctAnswer: 2
     },
     {
@@ -573,7 +573,7 @@ question: "If 3 cats catch 3 mice in 3 minutes, how many mice will 100 cats catc
     {
       id: 4,
       question: "All iOS apps use UIKit or SwiftUI. Some iOS apps also use CoreData.",
-      conclusion: ["All iOS apps use CoreData", "Some iOS apps do not use CoreData", "No iOS apps use CoreData", "Data insufficient"],
+      options: ["All iOS apps use CoreData", "Some iOS apps do not use CoreData", "No iOS apps use CoreData", "Data insufficient"],
       correctAnswer: 2
     },
     {
@@ -1828,6 +1828,6 @@ question: "If 3 cats catch 3 mice in 3 minutes, how many mice will 100 cats catc
 };
 
 // Fallback to Google questions if company not found
-export const getQuestions = (companyName: string): Question[] => {
-  return companyQuestionSets[companyName] || companyQuestionSets.Google;
+export const getQuestions = (companyName: string) => {
+  return companyQuestionSets[companyName] || [];
 };

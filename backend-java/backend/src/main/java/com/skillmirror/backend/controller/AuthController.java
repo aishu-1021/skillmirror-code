@@ -47,6 +47,6 @@ public class AuthController {
             return ResponseEntity.status(401).body("Invalid email or password");
         }
 
-        return ResponseEntity.ok("Login successful");
+        return ResponseEntity.ok(user);
     }
 }

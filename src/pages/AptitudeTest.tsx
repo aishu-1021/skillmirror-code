@@ -9,13 +9,13 @@ import { Target, Clock, ChevronLeft, ChevronRight, Flag, Mail, CheckCircle } fro
 import { useToast } from "@/hooks/use-toast";
 import { getQuestions } from "@/data/companyQuestions";
 import emailjs from "@emailjs/browser";
-
-
 const AptitudeTest = () => {
   const { companyId } = useParams();
   const navigate = useNavigate();
   const { toast } = useToast();
   const companyName = companyId ? decodeURIComponent(companyId) : "Google";
+  const storedUser = JSON.parse(localStorage.getItem("user") || "{}");
+  const userId = storedUser?.id ?? 1;
   const aptitudeQuestions = getQuestions(companyName);
 
   const [currentQuestion, setCurrentQuestion] = useState(0);
@@ -28,6 +28,11 @@ const AptitudeTest = () => {
   const CUTOFF_PERCENTAGE = 80;
   const [resultMessage, setResultMessage] = useState<string | null>(null);
 
+
+  useEffect(() => {
+    setAnswers(new Array(aptitudeQuestions.length).fill(null));
+    setCurrentQuestion(0);
+  }, [aptitudeQuestions.length]);
 
   useEffect(() => {
     if (isSubmitted) return;
@@ -111,18 +116,22 @@ const AptitudeTest = () => {
    setIsSendingEmail(true);
 
    try {
-     // 1️⃣ BACKEND EVALUATION (MUST WORK)
+     //BACKEND EVALUATION (MUST WORK)
+     console.log({
+       userId,
+       companyName,
+       answers
+     });
      const response = await fetch("http://localhost:8080/api/aptitude/evaluate", {
        method: "POST",
        headers: { "Content-Type": "application/json" },
        body: JSON.stringify({
+         userId: userId,
+         companyName: companyName,
          answers: answers.map((ans, index) => {
-           // If the question was not answered
            if (ans === null) {
-             return 0; // treat as wrong answer
+             return 0;
            }
-
-           // If answered, check correctness
            return ans === aptitudeQuestions[index].correctAnswer ? 1 : 0;
          }),
        }),
@@ -199,6 +208,16 @@ const AptitudeTest = () => {
    }
  };
 
+  const currentQ = aptitudeQuestions[currentQuestion];
+  if (!currentQ || !Array.isArray(currentQ.options)) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <p className="text-red-600 text-lg font-semibold">
+          Invalid question data detected. Please contact admin.
+        </p>
+      </div>
+    );
+  }
   const answeredCount = answers.filter(a => a !== null).length;
   const progress = (answeredCount / aptitudeQuestions.length) * 100;
 
@@ -406,7 +425,7 @@ const AptitudeTest = () => {
           </div>
 
           <div className="space-y-3">
-            {aptitudeQuestions[currentQuestion].options.map((option, index) => (
+            {currentQ.options.map((option, index) => (
               <button
                 key={index}
                 onClick={() => handleAnswerSelect(index)}
