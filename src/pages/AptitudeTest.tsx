@@ -9,13 +9,15 @@ import { Target, Clock, ChevronLeft, ChevronRight, Flag, Mail, CheckCircle } fro
 import { useToast } from "@/hooks/use-toast";
 import { getQuestions } from "@/data/companyQuestions";
 import emailjs from "@emailjs/browser";
+
+
 const AptitudeTest = () => {
   const { companyId } = useParams();
   const navigate = useNavigate();
   const { toast } = useToast();
   const companyName = companyId ? decodeURIComponent(companyId) : "Google";
   const storedUser = JSON.parse(localStorage.getItem("user") || "{}");
-  const userId = storedUser?.id ?? 1;
+   const userId: number | null = storedUser?.id ?? null;
   const aptitudeQuestions = getQuestions(companyName);
 
   const [currentQuestion, setCurrentQuestion] = useState(0);
@@ -25,31 +27,34 @@ const AptitudeTest = () => {
   const [email, setEmail] = useState("");
   const [testStarted, setTestStarted] = useState(false);
   const [isSendingEmail, setIsSendingEmail] = useState(false);
-  const CUTOFF_PERCENTAGE = 80;
+  const CUTOFF_PERCENTAGE = 75;
   const [resultMessage, setResultMessage] = useState<string | null>(null);
 
 
   useEffect(() => {
-    setAnswers(new Array(aptitudeQuestions.length).fill(null));
-    setCurrentQuestion(0);
-  }, [aptitudeQuestions.length]);
+      if (aptitudeQuestions.length > 0) {
+        setAnswers(new Array(aptitudeQuestions.length).fill(null));
+        setCurrentQuestion(0);
+      }
+    }, [aptitudeQuestions.length]);
 
-  useEffect(() => {
-    if (isSubmitted) return;
+    /* 🔥 FIX 2: Timer safety */
+    useEffect(() => {
+      if (isSubmitted || !testStarted) return;
 
-    const timer = setInterval(() => {
-      setTimeLeft((prev) => {
-        if (prev <= 1) {
-          clearInterval(timer);
-          handleSubmit();
-          return 0;
-        }
-        return prev - 1;
-      });
-    }, 1000);
+      const timer = setInterval(() => {
+        setTimeLeft((prev) => {
+          if (prev <= 1) {
+            clearInterval(timer);
+            handleSubmit();
+            return 0;
+          }
+          return prev - 1;
+        });
+      }, 1000);
 
-    return () => clearInterval(timer);
-  }, [isSubmitted]);
+      return () => clearInterval(timer);
+    }, [isSubmitted, testStarted]);
 
   const formatTime = (seconds: number) => {
     const mins = Math.floor(seconds / 60);
@@ -97,9 +102,11 @@ const AptitudeTest = () => {
     Object.entries(questionCategories).forEach(([category, questionIndices]) => {
       let wrongCount = 0;
       questionIndices.forEach(index => {
-        if (answers[index] !== aptitudeQuestions[index].correctAnswer) {
+        const correctIndex = aptitudeQuestions[index].correctAnswer - 1;
+        if (answers[index] !== correctIndex) {
           wrongCount++;
         }
+
       });
 
       if (wrongCount > 0) {
@@ -112,40 +119,36 @@ const AptitudeTest = () => {
 
  const handleSubmit = async () => {
    if (isSubmitted) return;
+   if (!userId || aptitudeQuestions.length === 0) return;
    setIsSubmitted(true);
    setIsSendingEmail(true);
 
+   const totalQuestions = aptitudeQuestions.length;
+   const correctCount = answers.reduce((count, ans, index) => {
+     const correctIndex = aptitudeQuestions[index].correctAnswer - 1;
+     return ans === correctIndex ? count + 1 : count;
+   }, 0);
+   const percentage =
+     totalQuestions === 0 ? 0 : (correctCount / totalQuestions) * 100;
+
+   const isPassed = percentage >= CUTOFF_PERCENTAGE;
+   const weakAreas = analyzeWeakAreas();
+
    try {
-     //BACKEND EVALUATION (MUST WORK)
-     console.log({
-       userId,
-       companyName,
-       answers
-     });
-     const response = await fetch("http://localhost:8080/api/aptitude/evaluate", {
+     await fetch("http://localhost:8080/api/aptitude/evaluate", {
        method: "POST",
        headers: { "Content-Type": "application/json" },
        body: JSON.stringify({
          userId: userId,
          companyName: companyName,
          answers: answers.map((ans, index) => {
-           if (ans === null) {
-             return 0;
-           }
-           return ans === aptitudeQuestions[index].correctAnswer ? 1 : 0;
+           if (ans === null) return 0;
+           const correctIndex = aptitudeQuestions[index].correctAnswer - 1;
+           return ans === correctIndex ? 1 : 0;
          }),
+
        }),
      });
-
-     const data = await response.json();
-     const totalQuestions = aptitudeQuestions.length;
-     const correctCount = answers.reduce((count, ans, index) => {
-       return ans === aptitudeQuestions[index].correctAnswer ? count + 1 : count;
-     }, 0);
-     const percentage = (correctCount / totalQuestions) * 100;
-     // ✅ THEN CONTINUE
-     const isPassed = percentage >= CUTOFF_PERCENTAGE;
-     const weakAreas = analyzeWeakAreas();
 
      // UI message (always show)
      setResultMessage(
@@ -208,18 +211,11 @@ const AptitudeTest = () => {
    }
  };
 
-  const currentQ = aptitudeQuestions[currentQuestion];
-  if (!currentQ || !Array.isArray(currentQ.options)) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <p className="text-red-600 text-lg font-semibold">
-          Invalid question data detected. Please contact admin.
-        </p>
-      </div>
-    );
-  }
-  const answeredCount = answers.filter(a => a !== null).length;
-  const progress = (answeredCount / aptitudeQuestions.length) * 100;
+  const answeredCount = answers.filter((a) => a !== null).length;
+    const progress =
+      aptitudeQuestions.length === 0
+        ? 0
+        : (answeredCount / aptitudeQuestions.length) * 100;
 
   // Email collection screen before test starts
   if (!testStarted) {
@@ -425,7 +421,7 @@ const AptitudeTest = () => {
           </div>
 
           <div className="space-y-3">
-            {currentQ.options.map((option, index) => (
+            {aptitudeQuestions[currentQuestion].options.map((option, index) => (
               <button
                 key={index}
                 onClick={() => handleAnswerSelect(index)}

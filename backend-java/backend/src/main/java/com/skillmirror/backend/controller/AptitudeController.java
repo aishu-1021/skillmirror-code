@@ -58,5 +58,10 @@ public class AptitudeController
 
         return result;
     }
+    @GetMapping("/user/{userId}")
+    public List<AptitudeAttempt> getAttemptsByUser(@PathVariable Long userId) {
+        return aptitudeAttemptRepository.findByUserId(userId);
+    }
+
 
 }
