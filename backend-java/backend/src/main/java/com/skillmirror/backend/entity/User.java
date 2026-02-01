@@ -19,6 +19,16 @@ public class User {
 
     private String password;
 
+    @Column(nullable = false)
+    private boolean aptitudePassed = false;
+
+    @Column(nullable = false)
+    private boolean technicalPassed = false;
+
+    @Column(nullable = false)
+    private boolean interviewUnlocked = false;
+
+
     // 🔹 REQUIRED: no-arg constructor
     public User() {}
 
@@ -58,5 +68,29 @@ public class User {
 
     public void setPassword(String password) {
         this.password = password;
+    }
+
+    public boolean isAptitudePassed() {
+        return aptitudePassed;
+    }
+
+    public void setAptitudePassed(boolean aptitudePassed) {
+        this.aptitudePassed = aptitudePassed;
+    }
+
+    public boolean isTechnicalPassed() {
+        return technicalPassed;
+    }
+
+    public void setTechnicalPassed(boolean technicalPassed) {
+        this.technicalPassed = technicalPassed;
+    }
+
+    public boolean isInterviewUnlocked() {
+        return interviewUnlocked;
+    }
+
+    public void setInterviewUnlocked(boolean interviewUnlocked) {
+        this.interviewUnlocked = interviewUnlocked;
     }
 }

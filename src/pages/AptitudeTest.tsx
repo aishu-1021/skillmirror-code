@@ -17,14 +17,15 @@ const AptitudeTest = () => {
   const { toast } = useToast();
   const companyName = companyId ? decodeURIComponent(companyId) : "Google";
   const storedUser = JSON.parse(localStorage.getItem("user") || "{}");
-   const userId: number | null = storedUser?.id ?? null;
+  const userId: number | null = storedUser?.id ?? null;
+  const [email, setEmail] = useState<string>(storedUser?.email ?? "");
+
   const aptitudeQuestions = getQuestions(companyName);
 
   const [currentQuestion, setCurrentQuestion] = useState(0);
   const [answers, setAnswers] = useState<(number | null)[]>(new Array(aptitudeQuestions.length).fill(null));
   const [timeLeft, setTimeLeft] = useState(40 * 60); // 40 minutes in seconds
   const [isSubmitted, setIsSubmitted] = useState(false);
-  const [email, setEmail] = useState("");
   const [testStarted, setTestStarted] = useState(false);
   const [isSendingEmail, setIsSendingEmail] = useState(false);
   const CUTOFF_PERCENTAGE = 75;
@@ -117,6 +118,14 @@ const AptitudeTest = () => {
     return weakCategories.length > 0 ? weakCategories : ["General aptitude concepts"];
   };
 
+ if (!email || !email.includes("@")) {
+   toast({
+     title: "Email Missing",
+     description: "Please provide a valid email address.",
+     variant: "destructive",
+   });
+   return;
+ }
  const handleSubmit = async () => {
    if (isSubmitted) return;
    if (!userId || aptitudeQuestions.length === 0) return;
@@ -159,10 +168,11 @@ const AptitudeTest = () => {
 
     try {
       await emailjs.send(
-        "service_kyg8j0o",          // ✅ your Service ID
+        "service_qmge4ea",          // ✅ your Service ID
         "template_tkihh98",         // ❗ replace with your TEMPLATE ID
         {
           to_email: email,          // ✅ REQUIRED
+          from_name: "SkillMirror",
           subject: isPassed
             ? "SkillMirror Aptitude Test – Qualified for Technical Round"
             : "SkillMirror Aptitude Test – Performance Analysis",
