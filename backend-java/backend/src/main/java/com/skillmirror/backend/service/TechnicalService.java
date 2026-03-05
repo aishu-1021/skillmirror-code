@@ -1,9 +1,12 @@
 package com.skillmirror.backend.service;
+
 import com.skillmirror.backend.entity.TechnicalAttempt;
 import com.skillmirror.backend.entity.User;
 import com.skillmirror.backend.repository.TechnicalAttemptRepository;
 import com.skillmirror.backend.repository.UserRepository;
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.time.LocalDateTime;
 import java.util.HashMap;
@@ -16,6 +19,9 @@ public class TechnicalService {
     private final TechnicalAttemptRepository repository;
     private final UserRepository userRepository;
 
+    //Max 2 attempts per company per hour
+    private static final int MAX_ATTEMPTS_PER_HOUR = 2;
+
     public TechnicalService(TechnicalAttemptRepository repository,
                             UserRepository userRepository) {
         this.repository = repository;
@@ -24,6 +30,20 @@ public class TechnicalService {
 
     public Map<String, Object> evaluate(Long userId, String companyName,
                                         List<Integer> answers) {
+
+        //RATE LIMITING CHECK
+        LocalDateTime oneHourAgo = LocalDateTime.now().minusHours(1);
+        long recentAttempts = repository
+                .countRecentAttempts(userId, companyName, oneHourAgo);
+
+        if (recentAttempts >= MAX_ATTEMPTS_PER_HOUR) {
+            throw new ResponseStatusException(
+                    HttpStatus.TOO_MANY_REQUESTS,
+                    "You have reached the maximum attempts for " + companyName +
+                            " technical test. Please wait 1 hour before trying again."
+            );
+        }
+
         int total = answers.size();
         int correct = 0;
 

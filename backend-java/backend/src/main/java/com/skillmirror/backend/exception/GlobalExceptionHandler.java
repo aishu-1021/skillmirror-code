@@ -8,11 +8,12 @@ import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.servlet.NoHandlerFoundException;
 import java.util.HashMap;
 import java.util.Map;
+import org.springframework.web.server.ResponseStatusException;
 
 @ControllerAdvice
 public class GlobalExceptionHandler {
 
-    // ✅ Handle validation errors (@Valid failures)
+    //Handle validation errors (@Valid failures)
     @ExceptionHandler(MethodArgumentNotValidException.class)
     public ResponseEntity<Map<String, String>> handleValidationErrors(
             MethodArgumentNotValidException ex) {
@@ -24,6 +25,17 @@ public class GlobalExceptionHandler {
         );
 
         return new ResponseEntity<>(errors, HttpStatus.BAD_REQUEST);
+    }
+
+    // Handle rate limiting (429 Too Many Requests)
+    @ExceptionHandler(ResponseStatusException.class)
+    public ResponseEntity<ErrorResponse> handleResponseStatusException(
+            ResponseStatusException ex) {
+        ErrorResponse error = new ErrorResponse(
+                ex.getStatusCode().value(),
+                ex.getReason()
+        );
+        return new ResponseEntity<>(error, ex.getStatusCode());
     }
 
     // Handle general exceptions

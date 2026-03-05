@@ -30,6 +30,8 @@ const AptitudeTest = () => {
   const [isSendingEmail, setIsSendingEmail] = useState(false);
   const CUTOFF_PERCENTAGE = 75;
   const [resultMessage, setResultMessage] = useState<string | null>(null);
+  const [isRateLimited, setIsRateLimited] = useState(false);
+  const [rateLimitMessage, setRateLimitMessage] = useState("");
 
   useEffect(() => {
     if (aptitudeQuestions.length > 0) {
@@ -143,8 +145,8 @@ const AptitudeTest = () => {
     const weakAreas = analyzeWeakAreas();
 
     try {
-      // ✅ Added JWT token to Authorization header
-      await fetch("http://localhost:8080/api/aptitude/evaluate", {
+      // ✅ Added rate limit handling
+      const evalResponse = await fetch("http://localhost:8080/api/aptitude/evaluate", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -160,6 +162,19 @@ const AptitudeTest = () => {
           }),
         }),
       });
+
+      // ✅ Handle rate limiting response
+      if (evalResponse.status === 429) {
+        const errorData = await evalResponse.json();
+        setIsRateLimited(true);
+        setRateLimitMessage(
+          errorData.message ||
+          "Too many attempts. Please wait 1 hour before trying again."
+        );
+        setIsSubmitted(false);
+        setIsSendingEmail(false);
+        return;
+      }
 
       setResultMessage(
         isPassed
@@ -222,6 +237,38 @@ const AptitudeTest = () => {
     aptitudeQuestions.length === 0
       ? 0
       : (answeredCount / aptitudeQuestions.length) * 100;
+
+  // ✅ Show locked screen if rate limited
+  if (isRateLimited) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center p-4">
+        <Card className="max-w-md w-full p-8 text-center">
+          <div className="mb-6">
+            <div className="h-20 w-20 rounded-full bg-destructive/10 flex items-center justify-center mx-auto mb-4">
+              <span className="text-4xl">🔒</span>
+            </div>
+            <h1 className="text-3xl font-bold mb-2 text-destructive">
+              Test Locked
+            </h1>
+            <p className="text-muted-foreground">{companyName} - Aptitude Test</p>
+          </div>
+
+          <div className="p-6 bg-destructive/5 border border-destructive/20 rounded-lg mb-6">
+            <p className="text-lg font-semibold text-destructive mb-2">
+              Too Many Attempts!
+            </p>
+            <p className="text-muted-foreground">
+              {rateLimitMessage}
+            </p>
+          </div>
+
+          <Button onClick={() => navigate("/dashboard")} className="w-full">
+            Back to Dashboard
+          </Button>
+        </Card>
+      </div>
+    );
+  }
 
   if (!testStarted) {
     return (
@@ -366,7 +413,6 @@ const AptitudeTest = () => {
 
   return (
     <div className="min-h-screen bg-background">
-      {/* Header */}
       <header className="bg-card border-b border-border sticky top-0 z-50">
         <div className="container mx-auto px-4 py-4">
           <div className="flex items-center justify-between">
@@ -403,7 +449,6 @@ const AptitudeTest = () => {
       </header>
 
       <div className="container mx-auto px-4 py-8 max-w-4xl">
-        {/* Progress */}
         <div className="mb-8">
           <div className="flex items-center justify-between mb-2">
             <span className="text-sm font-medium">
@@ -414,7 +459,6 @@ const AptitudeTest = () => {
           <Progress value={progress} className="h-2" />
         </div>
 
-        {/* Question Card */}
         <Card className="p-8 mb-6">
           <div className="mb-6">
             <div className="text-sm text-muted-foreground mb-2">
@@ -453,7 +497,6 @@ const AptitudeTest = () => {
           </div>
         </Card>
 
-        {/* Navigation */}
         <div className="flex items-center justify-between">
           <Button
             variant="outline"
@@ -477,7 +520,6 @@ const AptitudeTest = () => {
           </Button>
         </div>
 
-        {/* Question Navigator */}
         <Card className="mt-8 p-6">
           <h3 className="font-semibold mb-4">Question Navigator</h3>
           <div className="grid grid-cols-10 gap-2">

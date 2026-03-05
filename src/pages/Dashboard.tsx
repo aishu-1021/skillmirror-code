@@ -29,14 +29,36 @@ const companies = [
 
 const Dashboard = () => {
   const navigate = useNavigate();
-  const [attempts, setAttempts] = useState<any[]>([]);
+  const [aptitudeAttempts, setAptitudeAttempts] = useState<any[]>([]);
+  const [technicalAttempts, setTechnicalAttempts] = useState<any[]>([]);
+  const [rateLimitedAptitude, setRateLimitedAptitude] = useState<string[]>([]);
+  const [rateLimitedTechnical, setRateLimitedTechnical] = useState<string[]>([]);
 
-  const completedSimulations = attempts.length;
-  const certificatesEarned = attempts.filter(a => a.passed).length;
+  const completedSimulations = aptitudeAttempts.length + technicalAttempts.length;
+  const certificatesEarned = aptitudeAttempts.filter(a => a.passed).length;
 
-  const passedCompanies = attempts
+  const passedAptitudeCompanies = aptitudeAttempts
     .filter(a => a.passed === true)
     .map(a => a.companyName);
+
+  // ✅ Helper to calculate rate limited companies from attempts
+  const getRateLimited = (data: any[]) => {
+    const now = new Date();
+    const oneHourAgo = new Date(now.getTime() - 60 * 60 * 1000);
+
+    const companyCounts: { [key: string]: number } = {};
+    data.forEach((attempt: any) => {
+      const attemptTime = new Date(attempt.attemptedAt);
+      if (attemptTime >= oneHourAgo) {
+        companyCounts[attempt.companyName] =
+          (companyCounts[attempt.companyName] || 0) + 1;
+      }
+    });
+
+    return Object.entries(companyCounts)
+      .filter(([_, count]) => (count as number) >= 2)
+      .map(([company]) => company);
+  };
 
   useEffect(() => {
     const user = JSON.parse(localStorage.getItem("user") || "null");
@@ -47,30 +69,40 @@ const Dashboard = () => {
       return;
     }
 
-    // ✅ Include JWT token in the request header
-    fetch(`http://localhost:8080/api/aptitude/user/${user.id}`, {
-      headers: {
-        "Authorization": `Bearer ${token}`
-      }
-    })
-      .then(res => {
-        if (!res.ok) throw new Error("Failed to fetch attempts");
-        return res.json();
+    const headers = { "Authorization": `Bearer ${token}` };
+
+    // ✅ Fetch both aptitude and technical attempts
+    Promise.all([
+      fetch(`http://localhost:8080/api/aptitude/user/${user.id}`, { headers }),
+      fetch(`http://localhost:8080/api/technical/user/${user.id}`, { headers })
+    ])
+      .then(async ([aptRes, techRes]) => {
+        const aptData = aptRes.ok ? await aptRes.json() : [];
+        const techData = techRes.ok ? await techRes.json() : [];
+
+        console.log("Aptitude Attempts:", aptData);
+        console.log("Technical Attempts:", techData);
+
+        setAptitudeAttempts(aptData);
+        setTechnicalAttempts(techData);
+        setRateLimitedAptitude(getRateLimited(aptData));
+        setRateLimitedTechnical(getRateLimited(techData));
       })
-      .then(data => {
-        console.log("Attempts:", data);
-        setAttempts(data);
-      })
-      .catch(err => console.error("Error: Failed to fetch attempts", err));
+      .catch(err => console.error("Error fetching attempts:", err));
   }, [navigate]);
 
   const hasPassedAptitude = (companyName: string) => {
-    return attempts.some(
+    return aptitudeAttempts.some(
       a => a.companyName === companyName && a.passed === true
     );
   };
 
-  // ✅ Logout handler - clears token and user
+  const hasPassedTechnical = (companyName: string) => {
+    return technicalAttempts.some(
+      a => a.companyName === companyName && a.passed === true
+    );
+  };
+
   const handleLogout = () => {
     localStorage.removeItem("token");
     localStorage.removeItem("user");
@@ -92,7 +124,6 @@ const Dashboard = () => {
             </span>
           </Link>
 
-          {/* ✅ Logout now clears token properly */}
           <Button variant="ghost" size="sm" onClick={handleLogout}>
             <LogOut className="h-4 w-4 mr-2" />
             Logout
@@ -166,11 +197,30 @@ const Dashboard = () => {
                 <h3 className="text-xl font-bold mb-1">{company.name}</h3>
                 <p className="text-sm text-muted-foreground mb-4">{company.role}</p>
 
-                {hasPassedAptitude(company.name) ? (
-                  <Link to={`/technical-round/${encodeURIComponent(company.name)}`}>
-                    <Button className="w-full">Start Technical Round</Button>
-                  </Link>
+                {/* ✅ Full flow: aptitude → technical → locked states for both */}
+                {hasPassedTechnical(company.name) ? (
+                  // Passed technical — show interview button (future)
+                  <Button className="w-full" disabled variant="outline">
+                    🎉 Interview Round Coming Soon
+                  </Button>
+                ) : hasPassedAptitude(company.name) ? (
+                  // Passed aptitude — check if technical is rate limited
+                  rateLimitedTechnical.includes(company.name) ? (
+                    <Button className="w-full" disabled variant="outline">
+                      🔒 Locked — Try Again in 1 Hour
+                    </Button>
+                  ) : (
+                    <Link to={`/technical-round/${encodeURIComponent(company.name)}`}>
+                      <Button className="w-full">Start Technical Round</Button>
+                    </Link>
+                  )
+                ) : rateLimitedAptitude.includes(company.name) ? (
+                  // Aptitude rate limited
+                  <Button className="w-full" disabled variant="outline">
+                    🔒 Locked — Try Again in 1 Hour
+                  </Button>
                 ) : (
+                  // Default — start aptitude
                   <Link to={`/aptitude-test/${encodeURIComponent(company.name)}`}>
                     <Button variant="outline" className="w-full">
                       Start Aptitude Test
@@ -188,10 +238,10 @@ const Dashboard = () => {
 
           <div className="flex gap-2">
             <div className="px-3 py-1 rounded-full bg-muted text-sm">
-              🎯 Aptitude: {completedSimulations > 0 ? "Completed" : "Not started"}
+              🎯 Aptitude: {aptitudeAttempts.length > 0 ? "Completed" : "Not started"}
             </div>
             <div className="px-3 py-1 rounded-full bg-muted text-sm">
-              💻 Technical: {passedCompanies.length > 0 ? "Unlocked" : "Locked"}
+              💻 Technical: {passedAptitudeCompanies.length > 0 ? "Unlocked" : "Locked"}
             </div>
             <div className="px-3 py-1 rounded-full bg-muted text-sm">🧠 Managerial: Locked</div>
             <div className="px-3 py-1 rounded-full bg-muted text-sm">🤝 HR: Locked</div>

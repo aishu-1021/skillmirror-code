@@ -23,7 +23,6 @@ const TechnicalTest = () => {
   const navigate = useNavigate();
 
   const storedUser = JSON.parse(localStorage.getItem("user") || "{}");
-  // ✅ Get token from localStorage
   const token = localStorage.getItem("token");
   const userId: number | null = storedUser?.id ?? null;
   const [email] = useState<string>(storedUser?.email ?? "");
@@ -43,6 +42,9 @@ const TechnicalTest = () => {
   const [score, setScore] = useState(0);
   const [isSendingEmail, setIsSendingEmail] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  // ✅ Rate limiting states
+  const [isRateLimited, setIsRateLimited] = useState(false);
+  const [rateLimitMessage, setRateLimitMessage] = useState("");
 
   /* Reset */
   useEffect(() => {
@@ -123,7 +125,6 @@ const TechnicalTest = () => {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
-            // ✅ Added JWT token to Authorization header
             "Authorization": `Bearer ${token}`
           },
           body: JSON.stringify({
@@ -136,6 +137,19 @@ const TechnicalTest = () => {
         }
       );
 
+      // ✅ Handle rate limiting
+      if (res.status === 429) {
+        const errorData = await res.json();
+        setIsRateLimited(true);
+        setRateLimitMessage(
+          errorData.message ||
+          "Too many attempts. Please wait 1 hour before trying again."
+        );
+        setSubmitting(false);
+        setIsSendingEmail(false);
+        return;
+      }
+
       if (!res.ok) throw new Error("Backend evaluation failed");
 
       const result = await res.json();
@@ -143,7 +157,6 @@ const TechnicalTest = () => {
       setScore(Number(result.percentage.toFixed(2)));
       setSubmitted(true);
 
-      // ✅ Update localStorage with latest user state
       if (result.interviewUnlocked) {
         const currentUser = JSON.parse(localStorage.getItem("user") || "{}");
         const updatedUser = {
@@ -188,6 +201,40 @@ const TechnicalTest = () => {
     questions.length === 0
       ? 0
       : (answeredCount / questions.length) * 100;
+
+  // ✅ Show locked screen if rate limited
+  if (isRateLimited) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center p-4">
+        <Card className="max-w-md w-full p-8 text-center">
+          <div className="mb-6">
+            <div className="h-20 w-20 rounded-full bg-destructive/10 flex items-center justify-center mx-auto mb-4">
+              <span className="text-4xl">🔒</span>
+            </div>
+            <h1 className="text-3xl font-bold mb-2 text-destructive">
+              Test Locked
+            </h1>
+            <p className="text-muted-foreground">
+              {decodedCompany} - Technical Test
+            </p>
+          </div>
+
+          <div className="p-6 bg-destructive/5 border border-destructive/20 rounded-lg mb-6">
+            <p className="text-lg font-semibold text-destructive mb-2">
+              Too Many Attempts!
+            </p>
+            <p className="text-muted-foreground">
+              {rateLimitMessage}
+            </p>
+          </div>
+
+          <Button onClick={() => navigate("/dashboard")} className="w-full">
+            Back to Dashboard
+          </Button>
+        </Card>
+      </div>
+    );
+  }
 
   /* ===================== SUBMITTED SCREEN ===================== */
   if (submitted) {
@@ -246,7 +293,6 @@ const TechnicalTest = () => {
   /* ===================== MAIN TEST UI ===================== */
   return (
     <div className="min-h-screen bg-background">
-      {/* Header */}
       <header className="bg-card border-b border-border sticky top-0 z-50">
         <div className="container mx-auto px-4 py-4">
           <div className="flex items-center justify-between">
@@ -291,7 +337,6 @@ const TechnicalTest = () => {
       </header>
 
       <div className="container mx-auto px-4 py-8 max-w-4xl">
-        {/* Progress */}
         <div className="mb-8">
           <div className="flex items-center justify-between mb-2">
             <span className="text-sm font-medium">
@@ -304,7 +349,6 @@ const TechnicalTest = () => {
           <Progress value={progress} className="h-2" />
         </div>
 
-        {/* Question Card */}
         <Card className="p-8 mb-6">
           <div className="mb-6">
             <div className="text-sm text-muted-foreground mb-2">
@@ -347,7 +391,6 @@ const TechnicalTest = () => {
           </div>
         </Card>
 
-        {/* Navigation */}
         <div className="flex items-center justify-between">
           <Button
             variant="outline"
@@ -371,7 +414,6 @@ const TechnicalTest = () => {
           </Button>
         </div>
 
-        {/* Question Navigator */}
         <Card className="mt-8 p-6">
           <h3 className="font-semibold mb-4">Question Navigator</h3>
           <div className="grid grid-cols-10 gap-2">
