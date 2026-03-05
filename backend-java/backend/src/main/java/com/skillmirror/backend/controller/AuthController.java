@@ -1,10 +1,13 @@
 package com.skillmirror.backend.controller;
-import com.skillmirror.backend.dto.UserResponseDTO;
+
 import com.skillmirror.backend.entity.LoginRequest;
 import com.skillmirror.backend.entity.RegisterRequest;
 import com.skillmirror.backend.service.UserService;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+
+import java.util.Map;
+
 @RestController
 @RequestMapping("/api/auth")
 @CrossOrigin(origins = "http://localhost:5173")
@@ -29,13 +32,13 @@ public class AuthController {
 
     @PostMapping("/login")
     public ResponseEntity<?> login(@RequestBody LoginRequest request) {
-        // ✅ Now returns DTO instead of raw User
-        UserResponseDTO user = userService.login(request);
+        Map<String, Object> result = userService.login(request);
 
-        if (user == null) {
+        if (result == null) {
             return ResponseEntity.status(401).body("Invalid email or password");
         }
 
-        return ResponseEntity.ok(user);
+        // ✅ Returns both token and user data
+        return ResponseEntity.ok(result);
     }
 }

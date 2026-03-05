@@ -5,8 +5,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Target } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+
 const Login = () => {
-  //ALL hooks must be inside the component
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [isLoading, setIsLoading] = useState(false);
@@ -38,21 +38,25 @@ const Login = () => {
         return;
       }
 
-      //STEP 1: Read backend user object
-      const user = await response.json();
+      // ✅ STEP 1: Read backend response (now contains token + user)
+      const data = await response.json();
 
-      //STEP 2: Save logged-in user to localStorage
+      // ✅ STEP 2: Extract token and user separately
+      const { token, user } = data;
+
+      // ✅ STEP 3: Save both to localStorage
+      localStorage.setItem("token", token);
       localStorage.setItem("user", JSON.stringify(user));
 
-      //(Optional but good) Log once to confirm
       console.log("Logged in user:", user);
+      console.log("Token:", token);
 
       toast({
         title: "Welcome back!",
         description: "You've successfully logged in.",
       });
 
-      //STEP 3: Navigate AFTER saving user
+      // ✅ STEP 4: Navigate AFTER saving user
       navigate("/dashboard");
 
     } catch (err) {

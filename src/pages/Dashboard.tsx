@@ -31,24 +31,28 @@ const Dashboard = () => {
   const navigate = useNavigate();
   const [attempts, setAttempts] = useState<any[]>([]);
 
-  // ✅ DERIVED STATS (FIXED)
   const completedSimulations = attempts.length;
   const certificatesEarned = attempts.filter(a => a.passed).length;
 
-  // ✅ PASSED COMPANIES (FIXED)
   const passedCompanies = attempts
     .filter(a => a.passed === true)
     .map(a => a.companyName);
 
   useEffect(() => {
     const user = JSON.parse(localStorage.getItem("user") || "null");
+    const token = localStorage.getItem("token");
 
-    if (!user?.id) {
+    if (!user?.id || !token) {
       navigate("/login");
       return;
     }
 
-    fetch(`http://localhost:8080/api/aptitude/user/${user.id}`)
+    // ✅ Include JWT token in the request header
+    fetch(`http://localhost:8080/api/aptitude/user/${user.id}`, {
+      headers: {
+        "Authorization": `Bearer ${token}`
+      }
+    })
       .then(res => {
         if (!res.ok) throw new Error("Failed to fetch attempts");
         return res.json();
@@ -57,13 +61,20 @@ const Dashboard = () => {
         console.log("Attempts:", data);
         setAttempts(data);
       })
-      .catch(err => console.error(err));
+      .catch(err => console.error("Error: Failed to fetch attempts", err));
   }, [navigate]);
 
   const hasPassedAptitude = (companyName: string) => {
     return attempts.some(
       a => a.companyName === companyName && a.passed === true
     );
+  };
+
+  // ✅ Logout handler - clears token and user
+  const handleLogout = () => {
+    localStorage.removeItem("token");
+    localStorage.removeItem("user");
+    navigate("/");
   };
 
   return (
@@ -81,12 +92,11 @@ const Dashboard = () => {
             </span>
           </Link>
 
-          <Link to="/">
-            <Button variant="ghost" size="sm">
-              <LogOut className="h-4 w-4 mr-2" />
-              Logout
-            </Button>
-          </Link>
+          {/* ✅ Logout now clears token properly */}
+          <Button variant="ghost" size="sm" onClick={handleLogout}>
+            <LogOut className="h-4 w-4 mr-2" />
+            Logout
+          </Button>
         </div>
       </header>
 
@@ -192,4 +202,5 @@ const Dashboard = () => {
     </div>
   );
 };
+
 export default Dashboard;

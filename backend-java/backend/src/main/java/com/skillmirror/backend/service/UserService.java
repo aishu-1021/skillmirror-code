@@ -1,5 +1,6 @@
 package com.skillmirror.backend.service;
 
+import com.skillmirror.backend.config.JwtUtil;
 import com.skillmirror.backend.dto.UserResponseDTO;
 import com.skillmirror.backend.entity.User;
 import com.skillmirror.backend.entity.LoginRequest;
@@ -8,16 +9,22 @@ import com.skillmirror.backend.repository.UserRepository;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
+import java.util.HashMap;
+import java.util.Map;
+
 @Service
 public class UserService {
 
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
+    private final JwtUtil jwtUtil;
 
     public UserService(UserRepository userRepository,
-                       PasswordEncoder passwordEncoder) {
+                       PasswordEncoder passwordEncoder,
+                       JwtUtil jwtUtil) {
         this.userRepository = userRepository;
         this.passwordEncoder = passwordEncoder;
+        this.jwtUtil = jwtUtil;
     }
 
     // REGISTER
@@ -36,8 +43,8 @@ public class UserService {
         return "SUCCESS";
     }
 
-    // LOGIN - now returns DTO instead of raw User
-    public UserResponseDTO login(LoginRequest request) {
+    // LOGIN - returns token + user data
+    public Map<String, Object> login(LoginRequest request) {
         User user = userRepository.findByEmail(request.getEmail())
                 .orElse(null);
 
@@ -46,30 +53,37 @@ public class UserService {
         if (!passwordEncoder.matches(request.getPassword(),
                 user.getPassword())) return null;
 
-        // ✅ Convert to DTO before returning (no password included)
-        return convertToDTO(user);
+        // ✅ Generate JWT token
+        String token = jwtUtil.generateToken(user.getEmail(), user.getId());
+
+        // ✅ Return token + user data
+        Map<String, Object> response = new HashMap<>();
+        response.put("token", token);
+        response.put("user", convertToDTO(user));
+
+        return response;
     }
 
-    // GET USER BY ID - returns DTO
+    // GET USER BY ID
     public UserResponseDTO getUserById(Long id) {
         User user = userRepository.findById(id).orElse(null);
         if (user == null) return null;
         return convertToDTO(user);
     }
 
-    // GET USER BY EMAIL - returns DTO
+    // GET USER BY EMAIL
     public UserResponseDTO getUserByEmail(String email) {
         User user = userRepository.findByEmail(email).orElse(null);
         if (user == null) return null;
         return convertToDTO(user);
     }
 
-    // UPDATE USER - still works with raw User internally
+    // UPDATE USER
     public User updateUser(User user) {
         return userRepository.save(user);
     }
 
-    // ✅ HELPER METHOD - converts User entity to UserResponseDTO
+    // ✅ HELPER - convert to DTO
     public UserResponseDTO convertToDTO(User user) {
         return new UserResponseDTO(
                 user.getId(),
