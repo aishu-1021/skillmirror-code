@@ -10,13 +10,13 @@ import { useToast } from "@/hooks/use-toast";
 import { getQuestions } from "@/data/companyQuestions";
 import emailjs from "@emailjs/browser";
 
-
 const AptitudeTest = () => {
   const { companyId } = useParams();
   const navigate = useNavigate();
   const { toast } = useToast();
   const companyName = companyId ? decodeURIComponent(companyId) : "Google";
   const storedUser = JSON.parse(localStorage.getItem("user") || "{}");
+  const token = localStorage.getItem("token");
   const userId: number | null = storedUser?.id ?? null;
   const [email, setEmail] = useState<string>(storedUser?.email ?? "");
 
@@ -24,38 +24,36 @@ const AptitudeTest = () => {
 
   const [currentQuestion, setCurrentQuestion] = useState(0);
   const [answers, setAnswers] = useState<(number | null)[]>(new Array(aptitudeQuestions.length).fill(null));
-  const [timeLeft, setTimeLeft] = useState(40 * 60); // 40 minutes in seconds
+  const [timeLeft, setTimeLeft] = useState(40 * 60);
   const [isSubmitted, setIsSubmitted] = useState(false);
   const [testStarted, setTestStarted] = useState(false);
   const [isSendingEmail, setIsSendingEmail] = useState(false);
   const CUTOFF_PERCENTAGE = 75;
   const [resultMessage, setResultMessage] = useState<string | null>(null);
 
+  useEffect(() => {
+    if (aptitudeQuestions.length > 0) {
+      setAnswers(new Array(aptitudeQuestions.length).fill(null));
+      setCurrentQuestion(0);
+    }
+  }, [aptitudeQuestions.length]);
 
   useEffect(() => {
-      if (aptitudeQuestions.length > 0) {
-        setAnswers(new Array(aptitudeQuestions.length).fill(null));
-        setCurrentQuestion(0);
-      }
-    }, [aptitudeQuestions.length]);
+    if (isSubmitted || !testStarted) return;
 
-    /* 🔥 FIX 2: Timer safety */
-    useEffect(() => {
-      if (isSubmitted || !testStarted) return;
+    const timer = setInterval(() => {
+      setTimeLeft((prev) => {
+        if (prev <= 1) {
+          clearInterval(timer);
+          handleSubmit();
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
 
-      const timer = setInterval(() => {
-        setTimeLeft((prev) => {
-          if (prev <= 1) {
-            clearInterval(timer);
-            handleSubmit();
-            return 0;
-          }
-          return prev - 1;
-        });
-      }, 1000);
-
-      return () => clearInterval(timer);
-    }, [isSubmitted, testStarted]);
+    return () => clearInterval(timer);
+  }, [isSubmitted, testStarted]);
 
   const formatTime = (seconds: number) => {
     const mins = Math.floor(seconds / 60);
@@ -107,7 +105,6 @@ const AptitudeTest = () => {
         if (answers[index] !== correctIndex) {
           wrongCount++;
         }
-
       });
 
       if (wrongCount > 0) {
@@ -118,116 +115,114 @@ const AptitudeTest = () => {
     return weakCategories.length > 0 ? weakCategories : ["General aptitude concepts"];
   };
 
- if (!email || !email.includes("@")) {
-   toast({
-     title: "Email Missing",
-     description: "Please provide a valid email address.",
-     variant: "destructive",
-   });
-   return;
- }
- const handleSubmit = async () => {
-   if (isSubmitted) return;
-   if (!userId || aptitudeQuestions.length === 0) return;
-   setIsSubmitted(true);
-   setIsSendingEmail(true);
+  const handleSubmit = async () => {
+    if (isSubmitted) return;
+    if (!userId || aptitudeQuestions.length === 0) return;
 
-   const totalQuestions = aptitudeQuestions.length;
-   const correctCount = answers.reduce((count, ans, index) => {
-     const correctIndex = aptitudeQuestions[index].correctAnswer - 1;
-     return ans === correctIndex ? count + 1 : count;
-   }, 0);
-   const percentage =
-     totalQuestions === 0 ? 0 : (correctCount / totalQuestions) * 100;
-
-   const isPassed = percentage >= CUTOFF_PERCENTAGE;
-   const weakAreas = analyzeWeakAreas();
-
-   try {
-     await fetch("http://localhost:8080/api/aptitude/evaluate", {
-       method: "POST",
-       headers: { "Content-Type": "application/json" },
-       body: JSON.stringify({
-         userId: userId,
-         companyName: companyName,
-         answers: answers.map((ans, index) => {
-           if (ans === null) return 0;
-           const correctIndex = aptitudeQuestions[index].correctAnswer - 1;
-           return ans === correctIndex ? 1 : 0;
-         }),
-
-       }),
-     });
-
-     // UI message (always show)
-     setResultMessage(
-       isPassed
-         ? "Congratulations! You have cleared the Aptitude Round and qualified for the Technical Round 🎉"
-         : "You did not clear the Aptitude Round. Focus on your weak areas and try again 💪"
-     );
-
-    try {
-      await emailjs.send(
-        "service_qmge4ea",          // ✅ your Service ID
-        "template_tkihh98",         // ❗ replace with your TEMPLATE ID
-        {
-          to_email: email,          // ✅ REQUIRED
-          from_name: "SkillMirror",
-          subject: isPassed
-            ? "SkillMirror Aptitude Test – Qualified for Technical Round"
-            : "SkillMirror Aptitude Test – Performance Analysis",
-
-          message: isPassed
-            ? `Congratulations! You have cleared the Aptitude Round for ${companyName}.`
-            : `Thank you for taking the Aptitude Test for ${companyName}. Here is your detailed performance analysis.`,
-
-          score: `${correctCount}/${totalQuestions}`,
-          percentage: percentage.toFixed(2),
-          status: isPassed ? "PASSED" : "FAILED",
-          weak_areas: isPassed ? "None" : weakAreas.join(", "),
-          next_round: isPassed ? "Technical Round" : "Not Qualified",
-          resources: isPassed
-            ? "You are eligible for the Technical Round."
-            : "https://www.indiabix.com | https://www.geeksforgeeks.org/aptitude/"
-        },
-        "MMaLzV-Wvmsya4aWx"           // ❗ replace with your PUBLIC KEY
-      );
-
-
+    if (!email || !email.includes("@")) {
       toast({
-        title: "Email Sent Successfully",
-        description: `Results sent to ${email}`,
-      });
-    } catch (error) {
-      console.error("EmailJS Error:", error);
-
-      toast({
-        title: "Email Failed",
-        description: "Email service error. Check EmailJS configuration.",
+        title: "Email Missing",
+        description: "Please provide a valid email address.",
         variant: "destructive",
       });
+      return;
     }
 
+    setIsSubmitted(true);
+    setIsSendingEmail(true);
 
-   } catch (backendError) {
-     console.error("Backend failed:", backendError);
-     toast({
-       title: "Submission Failed",
-       description: "Could not evaluate test. Please try again.",
-       variant: "destructive",
-     });
-   } finally {
-     setIsSendingEmail(false);
-   }
- };
+    const totalQuestions = aptitudeQuestions.length;
+    const correctCount = answers.reduce((count, ans, index) => {
+      const correctIndex = aptitudeQuestions[index].correctAnswer - 1;
+      return ans === correctIndex ? count + 1 : count;
+    }, 0);
+    const percentage =
+      totalQuestions === 0 ? 0 : (correctCount / totalQuestions) * 100;
+
+    const isPassed = percentage >= CUTOFF_PERCENTAGE;
+    const weakAreas = analyzeWeakAreas();
+
+    try {
+      // ✅ Added JWT token to Authorization header
+      await fetch("http://localhost:8080/api/aptitude/evaluate", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          userId: userId,
+          companyName: companyName,
+          answers: answers.map((ans, index) => {
+            if (ans === null) return 0;
+            const correctIndex = aptitudeQuestions[index].correctAnswer - 1;
+            return ans === correctIndex ? 1 : 0;
+          }),
+        }),
+      });
+
+      setResultMessage(
+        isPassed
+          ? "Congratulations! You have cleared the Aptitude Round and qualified for the Technical Round 🎉"
+          : "You did not clear the Aptitude Round. Focus on your weak areas and try again 💪"
+      );
+
+      try {
+        await emailjs.send(
+          "service_qmge4ea",
+          "template_tkihh98",
+          {
+            to_email: email,
+            from_name: "SkillMirror",
+            subject: isPassed
+              ? "SkillMirror Aptitude Test – Qualified for Technical Round"
+              : "SkillMirror Aptitude Test – Performance Analysis",
+            message: isPassed
+              ? `Congratulations! You have cleared the Aptitude Round for ${companyName}.`
+              : `Thank you for taking the Aptitude Test for ${companyName}. Here is your detailed performance analysis.`,
+            score: `${correctCount}/${totalQuestions}`,
+            percentage: percentage.toFixed(2),
+            status: isPassed ? "PASSED" : "FAILED",
+            weak_areas: isPassed ? "None" : weakAreas.join(", "),
+            next_round: isPassed ? "Technical Round" : "Not Qualified",
+            resources: isPassed
+              ? "You are eligible for the Technical Round."
+              : "https://www.indiabix.com | https://www.geeksforgeeks.org/aptitude/"
+          },
+          "MMaLzV-Wvmsya4aWx"
+        );
+
+        toast({
+          title: "Email Sent Successfully",
+          description: `Results sent to ${email}`,
+        });
+      } catch (error) {
+        console.error("EmailJS Error:", error);
+        toast({
+          title: "Email Failed",
+          description: "Email service error. Check EmailJS configuration.",
+          variant: "destructive",
+        });
+      }
+
+    } catch (backendError) {
+      console.error("Backend failed:", backendError);
+      toast({
+        title: "Submission Failed",
+        description: "Could not evaluate test. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsSendingEmail(false);
+    }
+  };
 
   const answeredCount = answers.filter((a) => a !== null).length;
-    const progress =
-      aptitudeQuestions.length === 0
-        ? 0
-        : (answeredCount / aptitudeQuestions.length) * 100;
+  const progress =
+    aptitudeQuestions.length === 0
+      ? 0
+      : (answeredCount / aptitudeQuestions.length) * 100;
 
-  // Email collection screen before test starts
   if (!testStarted) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center p-4">
@@ -336,9 +331,7 @@ const AptitudeTest = () => {
                 </p>
                 <p className="text-xl font-bold text-primary">{email}</p>
                 <div className="mt-4 pt-4 border-t border-border">
-                  <p className="text-sm text-muted-foreground">
-                    The email includes:
-                  </p>
+                  <p className="text-sm text-muted-foreground">The email includes:</p>
                   <ul className="text-sm text-muted-foreground mt-2 space-y-1">
                     <li>✓ Your complete test score and percentage</li>
                     <li>✓ Detailed analysis of your weak areas</li>
@@ -349,6 +342,12 @@ const AptitudeTest = () => {
               </div>
             )}
           </div>
+
+          {!isSendingEmail && resultMessage && (
+            <div className="mb-6 text-lg font-semibold text-center">
+              {resultMessage}
+            </div>
+          )}
 
           {!isSendingEmail && (
             <div className="flex gap-3 justify-center">
@@ -364,12 +363,6 @@ const AptitudeTest = () => {
       </div>
     );
   }
-{isSubmitted && resultMessage && (
-  <div className="mt-6 text-center text-lg font-semibold">
-    {resultMessage}
-  </div>
-)}
-
 
   return (
     <div className="min-h-screen bg-background">
@@ -413,7 +406,9 @@ const AptitudeTest = () => {
         {/* Progress */}
         <div className="mb-8">
           <div className="flex items-center justify-between mb-2">
-            <span className="text-sm font-medium">Progress: {answeredCount}/{aptitudeQuestions.length} answered</span>
+            <span className="text-sm font-medium">
+              Progress: {answeredCount}/{aptitudeQuestions.length} answered
+            </span>
             <span className="text-sm text-muted-foreground">{progress.toFixed(0)}%</span>
           </div>
           <Progress value={progress} className="h-2" />
