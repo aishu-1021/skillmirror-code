@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useParams, useNavigate, Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
@@ -10,6 +10,16 @@ import { useToast } from "@/hooks/use-toast";
 import { getQuestions } from "@/data/companyQuestions";
 import emailjs from "@emailjs/browser";
 
+// ✅ Shuffle helper function
+const shuffleArray = <T,>(array: T[]): T[] => {
+  const shuffled = [...array];
+  for (let i = shuffled.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+  }
+  return shuffled;
+};
+
 const AptitudeTest = () => {
   const { companyId } = useParams();
   const navigate = useNavigate();
@@ -20,7 +30,26 @@ const AptitudeTest = () => {
   const userId: number | null = storedUser?.id ?? null;
   const [email, setEmail] = useState<string>(storedUser?.email ?? "");
 
-  const aptitudeQuestions = getQuestions(companyName);
+  const rawQuestions = getQuestions(companyName);
+
+  // ✅ Shuffle questions AND their options once when component mounts
+  const aptitudeQuestions = useMemo(() => {
+    // Step 1: Shuffle question order
+    const shuffledQuestions = shuffleArray(rawQuestions);
+
+    // Step 2: For each question, shuffle its options but track correct answer
+    return shuffledQuestions.map(q => {
+      const correctAnswerText = q.options[q.correctAnswer - 1]; // save correct answer text
+      const shuffledOptions = shuffleArray([...q.options]);      // shuffle options
+      const newCorrectIndex = shuffledOptions.indexOf(correctAnswerText) + 1; // find new position
+
+      return {
+        ...q,
+        options: shuffledOptions,
+        correctAnswer: newCorrectIndex, // update correct answer index
+      };
+    });
+  }, [companyName]); // ✅ Re-shuffle only when company changes
 
   const [currentQuestion, setCurrentQuestion] = useState(0);
   const [answers, setAnswers] = useState<(number | null)[]>(new Array(aptitudeQuestions.length).fill(null));
@@ -103,9 +132,11 @@ const AptitudeTest = () => {
     Object.entries(questionCategories).forEach(([category, questionIndices]) => {
       let wrongCount = 0;
       questionIndices.forEach(index => {
-        const correctIndex = aptitudeQuestions[index].correctAnswer - 1;
-        if (answers[index] !== correctIndex) {
-          wrongCount++;
+        if (index < aptitudeQuestions.length) {
+          const correctIndex = aptitudeQuestions[index].correctAnswer - 1;
+          if (answers[index] !== correctIndex) {
+            wrongCount++;
+          }
         }
       });
 
@@ -145,7 +176,6 @@ const AptitudeTest = () => {
     const weakAreas = analyzeWeakAreas();
 
     try {
-      // ✅ Added rate limit handling
       const evalResponse = await fetch("http://localhost:8080/api/aptitude/evaluate", {
         method: "POST",
         headers: {
@@ -163,7 +193,6 @@ const AptitudeTest = () => {
         }),
       });
 
-      // ✅ Handle rate limiting response
       if (evalResponse.status === 429) {
         const errorData = await evalResponse.json();
         setIsRateLimited(true);
@@ -238,7 +267,6 @@ const AptitudeTest = () => {
       ? 0
       : (answeredCount / aptitudeQuestions.length) * 100;
 
-  // ✅ Show locked screen if rate limited
   if (isRateLimited) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center p-4">
@@ -252,16 +280,12 @@ const AptitudeTest = () => {
             </h1>
             <p className="text-muted-foreground">{companyName} - Aptitude Test</p>
           </div>
-
           <div className="p-6 bg-destructive/5 border border-destructive/20 rounded-lg mb-6">
             <p className="text-lg font-semibold text-destructive mb-2">
               Too Many Attempts!
             </p>
-            <p className="text-muted-foreground">
-              {rateLimitMessage}
-            </p>
+            <p className="text-muted-foreground">{rateLimitMessage}</p>
           </div>
-
           <Button onClick={() => navigate("/dashboard")} className="w-full">
             Back to Dashboard
           </Button>
@@ -279,9 +303,7 @@ const AptitudeTest = () => {
               <Mail className="h-8 w-8 text-primary" />
             </div>
             <h1 className="text-2xl font-bold mb-2">Before You Start</h1>
-            <p className="text-muted-foreground">
-              {companyName} - Aptitude Test
-            </p>
+            <p className="text-muted-foreground">{companyName} - Aptitude Test</p>
           </div>
 
           <div className="space-y-4">

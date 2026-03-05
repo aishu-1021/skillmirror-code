@@ -1,5 +1,5 @@
 import emailjs from "@emailjs/browser";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useParams, useNavigate, Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
@@ -18,6 +18,16 @@ emailjs.init("MMaLzV-Wvmsya4aWx");
 
 const TECHNICAL_TIME = 20 * 60;
 
+// ✅ Shuffle helper function
+const shuffleArray = <T,>(array: T[]): T[] => {
+  const shuffled = [...array];
+  for (let i = shuffled.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+  }
+  return shuffled;
+};
+
 const TechnicalTest = () => {
   const { companyName } = useParams();
   const navigate = useNavigate();
@@ -31,7 +41,26 @@ const TechnicalTest = () => {
     ? decodeURIComponent(companyName)
     : "Google";
 
-  const questions = technicalQuestionSets[decodedCompany] || [];
+  const rawQuestions = technicalQuestionSets[decodedCompany] || [];
+
+  // ✅ Shuffle questions AND options once when component mounts
+  const questions = useMemo(() => {
+    // Step 1: Shuffle question order
+    const shuffledQuestions = shuffleArray(rawQuestions);
+
+    // Step 2: For each question, shuffle options but track correct answer
+    return shuffledQuestions.map(q => {
+      const correctAnswerText = q.options[q.correctAnswer - 1]; // save correct answer text
+      const shuffledOptions = shuffleArray([...q.options]);      // shuffle options
+      const newCorrectIndex = shuffledOptions.indexOf(correctAnswerText) + 1; // find new position
+
+      return {
+        ...q,
+        options: shuffledOptions,
+        correctAnswer: newCorrectIndex, // update correct answer index
+      };
+    });
+  }, [decodedCompany]); // ✅ Re-shuffle only when company changes
 
   const [currentQuestion, setCurrentQuestion] = useState(0);
   const [answers, setAnswers] = useState<(number | null)[]>(
@@ -42,7 +71,6 @@ const TechnicalTest = () => {
   const [score, setScore] = useState(0);
   const [isSendingEmail, setIsSendingEmail] = useState(false);
   const [submitting, setSubmitting] = useState(false);
-  // ✅ Rate limiting states
   const [isRateLimited, setIsRateLimited] = useState(false);
   const [rateLimitMessage, setRateLimitMessage] = useState("");
 
@@ -130,6 +158,7 @@ const TechnicalTest = () => {
           body: JSON.stringify({
             userId,
             companyName: decodedCompany,
+            // ✅ Uses shuffled correctAnswer to evaluate correctly
             answers: answers.map((ans, idx) =>
               ans === questions[idx].correctAnswer - 1 ? 1 : 0
             ),
@@ -137,7 +166,6 @@ const TechnicalTest = () => {
         }
       );
 
-      // ✅ Handle rate limiting
       if (res.status === 429) {
         const errorData = await res.json();
         setIsRateLimited(true);
@@ -202,7 +230,6 @@ const TechnicalTest = () => {
       ? 0
       : (answeredCount / questions.length) * 100;
 
-  // ✅ Show locked screen if rate limited
   if (isRateLimited) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center p-4">
@@ -218,16 +245,12 @@ const TechnicalTest = () => {
               {decodedCompany} - Technical Test
             </p>
           </div>
-
           <div className="p-6 bg-destructive/5 border border-destructive/20 rounded-lg mb-6">
             <p className="text-lg font-semibold text-destructive mb-2">
               Too Many Attempts!
             </p>
-            <p className="text-muted-foreground">
-              {rateLimitMessage}
-            </p>
+            <p className="text-muted-foreground">{rateLimitMessage}</p>
           </div>
-
           <Button onClick={() => navigate("/dashboard")} className="w-full">
             Back to Dashboard
           </Button>
@@ -236,7 +259,6 @@ const TechnicalTest = () => {
     );
   }
 
-  /* ===================== SUBMITTED SCREEN ===================== */
   if (submitted) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center p-4">
@@ -290,7 +312,6 @@ const TechnicalTest = () => {
     );
   }
 
-  /* ===================== MAIN TEST UI ===================== */
   return (
     <div className="min-h-screen bg-background">
       <header className="bg-card border-b border-border sticky top-0 z-50">
