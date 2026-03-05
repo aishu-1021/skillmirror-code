@@ -1,62 +1,38 @@
 package com.skillmirror.backend.controller;
-
-import com.skillmirror.backend.entity.User;
+import com.skillmirror.backend.dto.UserResponseDTO;
 import com.skillmirror.backend.entity.LoginRequest;
 import com.skillmirror.backend.entity.RegisterRequest;
-import com.skillmirror.backend.repository.UserRepository;
-
+import com.skillmirror.backend.service.UserService;
 import org.springframework.http.ResponseEntity;
-import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.web.bind.annotation.*;
-
 @RestController
 @RequestMapping("/api/auth")
 @CrossOrigin(origins = "http://localhost:5173")
 public class AuthController {
 
-    private final UserRepository userRepository;
-    private final PasswordEncoder passwordEncoder;
+    private final UserService userService;
 
-    public AuthController(UserRepository userRepository,
-                          PasswordEncoder passwordEncoder) {
-        this.userRepository = userRepository;
-        this.passwordEncoder = passwordEncoder;
+    public AuthController(UserService userService) {
+        this.userService = userService;
     }
 
-    // REGISTER
     @PostMapping("/register")
     public ResponseEntity<?> register(@RequestBody RegisterRequest request) {
+        String result = userService.register(request);
 
-        if (userRepository.findByEmail(request.getEmail()).isPresent()) {
+        if (result.equals("EMAIL_EXISTS")) {
             return ResponseEntity.badRequest().body("Email already exists");
         }
-
-        User user = new User();
-        user.setFullName(request.getFullName());
-        user.setEmail(request.getEmail());
-        user.setCollege(request.getCollege());
-
-        // ✅ ENCRYPT PASSWORD BEFORE SAVING
-        user.setPassword(passwordEncoder.encode(request.getPassword()));
-
-        userRepository.save(user);
 
         return ResponseEntity.ok("User registered successfully");
     }
 
-    // LOGIN
     @PostMapping("/login")
     public ResponseEntity<?> login(@RequestBody LoginRequest request) {
-
-        User user = userRepository.findByEmail(request.getEmail())
-                .orElse(null);
+        // ✅ Now returns DTO instead of raw User
+        UserResponseDTO user = userService.login(request);
 
         if (user == null) {
-            return ResponseEntity.status(401).body("Invalid email or password");
-        }
-
-        // COMPARE ENCRYPTED PASSWORD
-        if (!passwordEncoder.matches(request.getPassword(), user.getPassword())) {
             return ResponseEntity.status(401).body("Invalid email or password");
         }
 
