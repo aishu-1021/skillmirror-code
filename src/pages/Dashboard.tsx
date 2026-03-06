@@ -57,13 +57,7 @@ const Dashboard = () => {
     .map(a => a.companyName);
 
   useEffect(() => {
-    // ✅ Use context instead of reading localStorage manually
-    if (!isLoggedIn || !user?.id) {
-      navigate("/login");
-      return;
-    }
-
-    // ✅ Fetch progress using context's refreshProgress
+    // Fetch progress using context's refreshProgress
     refreshProgress(user.id);
   }, [isLoggedIn, user?.id]);
 
