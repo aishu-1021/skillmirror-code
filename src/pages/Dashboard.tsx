@@ -5,6 +5,8 @@ import { Target, LogOut, TrendingUp, Award, Clock } from "lucide-react";
 // ✅ Import from context instead of API directly
 import { useAuth } from "@/context/AuthContext";
 import { useProgress } from "@/context/ProgressContext";
+// Import shared types
+import { Company } from "@/types";
 
 import googleLogo from "@/assets/google-logo.png";
 import microsoftLogo from "@/assets/microsoft-logo.png";
@@ -17,7 +19,7 @@ import spotifyLogo from "@/assets/spotify-logo.png";
 import adobeLogo from "@/assets/adobe-logo.png";
 import ibmLogo from "@/assets/ibm-logo.png";
 
-const companies = [
+const companies: Company[] = [
   { id: 1, name: "Google", role: "Software Engineer", logo: googleLogo, color: "bg-white", isImage: true },
   { id: 2, name: "Microsoft", role: "Full Stack Developer", logo: microsoftLogo, color: "bg-white", isImage: true },
   { id: 3, name: "Amazon", role: "Cloud Engineer", logo: amazonLogo, color: "bg-white", isImage: true },

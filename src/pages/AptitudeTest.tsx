@@ -10,11 +10,13 @@ import { useToast } from "@/hooks/use-toast";
 import { getQuestions } from "@/data/companyQuestions";
 import emailjs from "@emailjs/browser";
 import { evaluateAptitude } from "@/api/aptitudeApi";
-// ✅ Import from context
+// Import shared types
+import { Question, AptitudeEvalResult } from "@/types";
+// Import from context
 import { useAuth } from "@/context/AuthContext";
 import { useProgress } from "@/context/ProgressContext";
 
-// ✅ Shuffle helper function
+// Shuffle helper function
 const shuffleArray = <T,>(array: T[]): T[] => {
   const shuffled = [...array];
   for (let i = shuffled.length - 1; i > 0; i--) {
@@ -40,7 +42,7 @@ const AptitudeTest = () => {
 
   const rawQuestions = getQuestions(companyName);
 
-  const aptitudeQuestions = useMemo(() => {
+  const aptitudeQuestions: Question[] = useMemo(() => {
     const shuffledQuestions = shuffleArray(rawQuestions);
     return shuffledQuestions.map(q => {
       const correctAnswerText = q.options[q.correctAnswer - 1];

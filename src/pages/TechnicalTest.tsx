@@ -14,7 +14,9 @@ import {
 } from "lucide-react";
 import { technicalQuestionSets } from "@/data/technicalQuestions";
 import { evaluateTechnical } from "@/api/technicalApi";
-// ✅ Import from context
+// Import shared types
+import { Question, TechnicalEvalResult } from "@/types";
+// Import from context
 import { useAuth } from "@/context/AuthContext";
 import { useProgress } from "@/context/ProgressContext";
 
@@ -49,7 +51,7 @@ const TechnicalTest = () => {
 
   const rawQuestions = technicalQuestionSets[decodedCompany] || [];
 
-  const questions = useMemo(() => {
+  const questions: Question[] = useMemo(() => {
     const shuffledQuestions = shuffleArray(rawQuestions);
     return shuffledQuestions.map(q => {
       const correctAnswerText = q.options[q.correctAnswer - 1];

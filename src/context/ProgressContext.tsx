@@ -1,17 +1,8 @@
 import { createContext, useContext, useState, ReactNode } from "react";
 import { getAptitudeAttempts } from "@/api/aptitudeApi";
 import { getTechnicalAttempts } from "@/api/technicalApi";
-// Define what a single attempt looks like
-interface Attempt {
-  id: number;
-  userId: number;
-  companyName: string;
-  totalQuestions: number;
-  correctAnswers: number;
-  percentage: number;
-  passed: boolean;
-  attemptedAt: string;
-}
+// Import Attempt from shared types
+import { Attempt } from "@/types";
 
 // Define what ProgressContext provides to components
 interface ProgressContextType {

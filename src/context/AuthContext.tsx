@@ -1,14 +1,6 @@
 import { createContext, useContext, useState, ReactNode } from "react";
-// Define what a User looks like
-interface User {
-  id: number;
-  fullName: string;
-  email: string;
-  college: string;
-  aptitudePassed: boolean;
-  technicalPassed: boolean;
-  interviewUnlocked: boolean;
-}
+//Import User from shared types
+import { User } from "@/types";
 
 // Define what AuthContext provides to components
 interface AuthContextType {
