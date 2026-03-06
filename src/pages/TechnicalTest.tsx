@@ -1,5 +1,5 @@
 import emailjs from "@emailjs/browser";
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useRef, useMemo } from "react";
 import { useParams, useNavigate, Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
@@ -14,9 +14,7 @@ import {
 } from "lucide-react";
 import { technicalQuestionSets } from "@/data/technicalQuestions";
 import { evaluateTechnical } from "@/api/technicalApi";
-// Import shared types
-import { Question, TechnicalEvalResult } from "@/types";
-// Import from context
+import { Question } from "@/types";
 import { useAuth } from "@/context/AuthContext";
 import { useProgress } from "@/context/ProgressContext";
 
@@ -37,13 +35,15 @@ const TechnicalTest = () => {
   const { companyName } = useParams();
   const navigate = useNavigate();
 
-  // ✅ Get user from AuthContext instead of localStorage
   const { user, updateUser } = useAuth();
   const userId: number | null = user?.id ?? null;
   const [email] = useState<string>(user?.email ?? "");
 
-  // ✅ Get refreshProgress from ProgressContext
-  const { refreshProgress } = useProgress();
+  // ✅ Get addPracticeTime from ProgressContext
+  const { refreshProgress, addPracticeTime } = useProgress();
+
+  // ✅ Track when the test started
+  const testStartTimeRef = useRef<number>(Date.now());
 
   const decodedCompany = companyName
     ? decodeURIComponent(companyName)
@@ -85,6 +85,8 @@ const TechnicalTest = () => {
     setTimeLeft(TECHNICAL_TIME);
     setSubmitted(false);
     setScore(0);
+    // ✅ Reset start time when company changes
+    testStartTimeRef.current = Date.now();
   }, [decodedCompany]);
 
   /* Timer */
@@ -146,6 +148,12 @@ const TechnicalTest = () => {
     if (!userId || submitted || submitting) return;
     if (!email || !email.includes("@")) return;
 
+    // ✅ Calculate time spent and save to practice tracker
+    const secondsSpent = Math.floor(
+      (Date.now() - testStartTimeRef.current) / 1000
+    );
+    addPracticeTime(secondsSpent, userId);
+
     setSubmitting(true);
     setIsSendingEmail(true);
 
@@ -177,7 +185,6 @@ const TechnicalTest = () => {
       setScore(Number(result.percentage.toFixed(2)));
       setSubmitted(true);
 
-      // ✅ Always update + refresh regardless of interviewUnlocked
       if (user) {
         updateUser({
           ...user,
@@ -395,9 +402,9 @@ const TechnicalTest = () => {
                           : "border-border"
                       }`}
                     >
-                      {answers[currentQuestion] === index && ((
+                      {answers[currentQuestion] === index && (
                         <div className="h-2 w-2 rounded-full bg-primary-foreground" />
-                      ))}
+                      )}
                     </div>
                     <span>{option}</span>
                   </div>

@@ -1,10 +1,8 @@
 import { createContext, useContext, useState, ReactNode } from "react";
 import { getAptitudeAttempts } from "@/api/aptitudeApi";
 import { getTechnicalAttempts } from "@/api/technicalApi";
-// Import Attempt from shared types
 import { Attempt } from "@/types";
 
-// Define what ProgressContext provides to components
 interface ProgressContextType {
   aptitudeAttempts: Attempt[];
   technicalAttempts: Attempt[];
@@ -14,12 +12,14 @@ interface ProgressContextType {
   refreshProgress: (userId: number) => Promise<void>;
   hasPassedAptitude: (companyName: string) => boolean;
   hasPassedTechnical: (companyName: string) => boolean;
+  // ✅ Practice time
+  practiceSeconds: number;
+  formattedPracticeTime: string;
+  addPracticeTime: (seconds: number, userId: number) => void;
 }
 
-// Create the context
 const ProgressContext = createContext<ProgressContextType | null>(null);
 
-// Helper — calculates which companies are rate limited
 const getRateLimited = (data: Attempt[]): string[] => {
   const now = new Date();
   const oneHourAgo = new Date(now.getTime() - 60 * 60 * 1000);
@@ -38,15 +38,36 @@ const getRateLimited = (data: Attempt[]): string[] => {
     .map(([company]) => company);
 };
 
-// Provider — wraps the app and provides progress state
+// ✅ Load saved practice time from localStorage for this user
+const loadPracticeTime = (userId: number): number => {
+  const saved = localStorage.getItem(`practiceTime_${userId}`);
+  return saved ? parseInt(saved, 10) : 0;
+};
+
+// ✅ Format seconds into "1h 23m" or "45m" or "30s"
+export const formatPracticeTime = (totalSeconds: number): string => {
+  if (totalSeconds === 0) return "0m";
+
+  const hours = Math.floor(totalSeconds / 3600);
+  const minutes = Math.floor((totalSeconds % 3600) / 60);
+  const seconds = totalSeconds % 60;
+
+  if (hours > 0 && minutes > 0) return `${hours}h ${minutes}m`;
+  if (hours > 0) return `${hours}h`;
+  if (minutes > 0 && seconds > 0) return `${minutes}m ${seconds}s`;
+  if (minutes > 0) return `${minutes}m`;
+  return `${seconds}s`;
+};
+
 export const ProgressProvider = ({ children }: { children: ReactNode }) => {
   const [aptitudeAttempts, setAptitudeAttempts] = useState<Attempt[]>([]);
   const [technicalAttempts, setTechnicalAttempts] = useState<Attempt[]>([]);
   const [rateLimitedAptitude, setRateLimitedAptitude] = useState<string[]>([]);
   const [rateLimitedTechnical, setRateLimitedTechnical] = useState<string[]>([]);
   const [isLoading, setIsLoading] = useState(false);
+  // ✅ Practice time state — starts at 0, loads from localStorage when user logs in
+  const [practiceSeconds, setPracticeSeconds] = useState<number>(0);
 
-  // Fetches latest attempts and recalculates rate limits
   const refreshProgress = async (userId: number) => {
     setIsLoading(true);
     try {
@@ -62,6 +83,9 @@ export const ProgressProvider = ({ children }: { children: ReactNode }) => {
       setTechnicalAttempts(techData);
       setRateLimitedAptitude(getRateLimited(aptData));
       setRateLimitedTechnical(getRateLimited(techData));
+
+      // ✅ Load this user's practice time when progress refreshes
+      setPracticeSeconds(loadPracticeTime(userId));
     } catch (err) {
       console.error("Failed to refresh progress:", err);
     } finally {
@@ -69,14 +93,22 @@ export const ProgressProvider = ({ children }: { children: ReactNode }) => {
     }
   };
 
-  // Check if user passed aptitude for a specific company
+  // ✅ Called when a test is submitted — adds time spent to total
+  const addPracticeTime = (seconds: number, userId: number) => {
+    setPracticeSeconds(prev => {
+      const newTotal = prev + seconds;
+      // Save to localStorage so it persists across sessions
+      localStorage.setItem(`practiceTime_${userId}`, newTotal.toString());
+      return newTotal;
+    });
+  };
+
   const hasPassedAptitude = (companyName: string): boolean => {
     return aptitudeAttempts.some(
       (a) => a.companyName === companyName && a.passed === true
     );
   };
 
-  // Check if user passed technical for a specific company
   const hasPassedTechnical = (companyName: string): boolean => {
     return technicalAttempts.some(
       (a) => a.companyName === companyName && a.passed === true
@@ -93,13 +125,15 @@ export const ProgressProvider = ({ children }: { children: ReactNode }) => {
       refreshProgress,
       hasPassedAptitude,
       hasPassedTechnical,
+      practiceSeconds,
+      formattedPracticeTime: formatPracticeTime(practiceSeconds),
+      addPracticeTime,
     }}>
       {children}
     </ProgressContext.Provider>
   );
 };
 
-// Custom hook — components use this to access progress
 export const useProgress = () => {
   const context = useContext(ProgressContext);
   if (!context) {

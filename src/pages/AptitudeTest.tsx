@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useRef, useMemo } from "react";
 import { useParams, useNavigate, Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
@@ -10,13 +10,10 @@ import { useToast } from "@/hooks/use-toast";
 import { getQuestions } from "@/data/companyQuestions";
 import emailjs from "@emailjs/browser";
 import { evaluateAptitude } from "@/api/aptitudeApi";
-// Import shared types
-import { Question, AptitudeEvalResult } from "@/types";
-// Import from context
+import { Question } from "@/types";
 import { useAuth } from "@/context/AuthContext";
 import { useProgress } from "@/context/ProgressContext";
 
-// Shuffle helper function
 const shuffleArray = <T,>(array: T[]): T[] => {
   const shuffled = [...array];
   for (let i = shuffled.length - 1; i > 0; i--) {
@@ -32,13 +29,15 @@ const AptitudeTest = () => {
   const { toast } = useToast();
   const companyName = companyId ? decodeURIComponent(companyId) : "Google";
 
-  // ✅ Get user from AuthContext instead of localStorage
   const { user } = useAuth();
   const userId: number | null = user?.id ?? null;
   const [email, setEmail] = useState<string>(user?.email ?? "");
 
-  // ✅ Get refreshProgress from ProgressContext
-  const { refreshProgress } = useProgress();
+  // ✅ Get addPracticeTime from ProgressContext
+  const { refreshProgress, addPracticeTime } = useProgress();
+
+  // ✅ Track when the test actually started
+  const testStartTimeRef = useRef<number | null>(null);
 
   const rawQuestions = getQuestions(companyName);
 
@@ -73,6 +72,13 @@ const AptitudeTest = () => {
       setCurrentQuestion(0);
     }
   }, [aptitudeQuestions.length]);
+
+  // ✅ Start tracking time when test begins
+  useEffect(() => {
+    if (testStarted && !testStartTimeRef.current) {
+      testStartTimeRef.current = Date.now();
+    }
+  }, [testStarted]);
 
   useEffect(() => {
     if (isSubmitted || !testStarted) return;
@@ -165,6 +171,14 @@ const AptitudeTest = () => {
       return;
     }
 
+    // ✅ Calculate time spent and save to practice tracker
+    if (testStartTimeRef.current && userId) {
+      const secondsSpent = Math.floor(
+        (Date.now() - testStartTimeRef.current) / 1000
+      );
+      addPracticeTime(secondsSpent, userId);
+    }
+
     setIsSubmitted(true);
     setIsSendingEmail(true);
 
@@ -202,7 +216,6 @@ const AptitudeTest = () => {
         return;
       }
 
-      // ✅ Refresh global progress after successful submission
       if (userId) await refreshProgress(userId);
 
       setResultMessage(
@@ -566,5 +579,4 @@ const AptitudeTest = () => {
     </div>
   );
 };
-
 export default AptitudeTest;

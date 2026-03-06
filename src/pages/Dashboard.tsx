@@ -2,10 +2,8 @@ import { useEffect } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Target, LogOut, TrendingUp, Award, Clock } from "lucide-react";
-// ✅ Import from context instead of API directly
 import { useAuth } from "@/context/AuthContext";
 import { useProgress } from "@/context/ProgressContext";
-// Import shared types
 import { Company } from "@/types";
 
 import googleLogo from "@/assets/google-logo.png";
@@ -35,10 +33,8 @@ const companies: Company[] = [
 const Dashboard = () => {
   const navigate = useNavigate();
 
-  // ✅ Get user and logout from AuthContext
   const { user, isLoggedIn, logout } = useAuth();
 
-  // ✅ Get progress data from ProgressContext
   const {
     aptitudeAttempts,
     technicalAttempts,
@@ -48,6 +44,8 @@ const Dashboard = () => {
     refreshProgress,
     hasPassedAptitude,
     hasPassedTechnical,
+    // ✅ Pull practice time from context
+    formattedPracticeTime,
   } = useProgress();
 
   const completedSimulations = aptitudeAttempts.length + technicalAttempts.length;
@@ -57,12 +55,10 @@ const Dashboard = () => {
     .map(a => a.companyName);
 
   useEffect(() => {
-    // Fetch progress using context's refreshProgress
-    refreshProgress(user.id);
+    refreshProgress(user!.id);
   }, [isLoggedIn, user?.id]);
 
   const handleLogout = () => {
-    // ✅ Use context logout() instead of manually clearing localStorage
     logout();
     navigate("/");
   };
@@ -82,7 +78,6 @@ const Dashboard = () => {
             </span>
           </Link>
 
-          {/* ✅ Show user's name from context */}
           <div className="flex items-center gap-4">
             {user && (
               <span className="text-sm text-muted-foreground hidden md:block">
@@ -101,7 +96,6 @@ const Dashboard = () => {
 
         {/* Welcome */}
         <div className="mb-12">
-          {/* ✅ Show actual user name from context */}
           <h1 className="text-4xl font-bold mb-2">
             Welcome back, {user?.fullName?.split(" ")[0] || "Candidate"}!
           </h1>
@@ -142,14 +136,15 @@ const Dashboard = () => {
                 <Clock className="h-6 w-6 text-white" />
               </div>
               <div>
-                <div className="text-2xl font-bold">0h</div>
+                {/* ✅ Show real practice time instead of hardcoded "0h" */}
+                <div className="text-2xl font-bold">{formattedPracticeTime}</div>
                 <div className="text-sm text-muted-foreground">Practice Time</div>
               </div>
             </div>
           </div>
         </div>
 
-        {/* ✅ Show loading state while fetching */}
+        {/* Show loading state while fetching */}
         {isLoading ? (
           <div className="text-center py-12 text-muted-foreground">
             Loading your progress...
@@ -173,7 +168,6 @@ const Dashboard = () => {
                     <h3 className="text-xl font-bold mb-1">{company.name}</h3>
                     <p className="text-sm text-muted-foreground mb-4">{company.role}</p>
 
-                    {/* ✅ Using context helper functions */}
                     {hasPassedTechnical(company.name) ? (
                       <Button className="w-full" disabled variant="outline">
                         🎉 Interview Round Coming Soon
