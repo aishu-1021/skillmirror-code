@@ -1,10 +1,11 @@
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Target, LogOut, TrendingUp, Award, Clock } from "lucide-react";
-// Import from centralized API
-import { getAptitudeAttempts } from "@/api/aptitudeApi";
-import { getTechnicalAttempts } from "@/api/technicalApi";
+// ✅ Import from context instead of API directly
+import { useAuth } from "@/context/AuthContext";
+import { useProgress } from "@/context/ProgressContext";
+
 import googleLogo from "@/assets/google-logo.png";
 import microsoftLogo from "@/assets/microsoft-logo.png";
 import amazonLogo from "@/assets/amazon-logo.png";
@@ -31,80 +32,42 @@ const companies = [
 
 const Dashboard = () => {
   const navigate = useNavigate();
-  const [aptitudeAttempts, setAptitudeAttempts] = useState<any[]>([]);
-  const [technicalAttempts, setTechnicalAttempts] = useState<any[]>([]);
-  const [rateLimitedAptitude, setRateLimitedAptitude] = useState<string[]>([]);
-  const [rateLimitedTechnical, setRateLimitedTechnical] = useState<string[]>([]);
+
+  // ✅ Get user and logout from AuthContext
+  const { user, isLoggedIn, logout } = useAuth();
+
+  // ✅ Get progress data from ProgressContext
+  const {
+    aptitudeAttempts,
+    technicalAttempts,
+    rateLimitedAptitude,
+    rateLimitedTechnical,
+    isLoading,
+    refreshProgress,
+    hasPassedAptitude,
+    hasPassedTechnical,
+  } = useProgress();
 
   const completedSimulations = aptitudeAttempts.length + technicalAttempts.length;
   const certificatesEarned = aptitudeAttempts.filter(a => a.passed).length;
-
   const passedAptitudeCompanies = aptitudeAttempts
     .filter(a => a.passed === true)
     .map(a => a.companyName);
 
-  const getRateLimited = (data: any[]) => {
-    const now = new Date();
-    const oneHourAgo = new Date(now.getTime() - 60 * 60 * 1000);
-
-    const companyCounts: { [key: string]: number } = {};
-    data.forEach((attempt: any) => {
-      const attemptTime = new Date(attempt.attemptedAt);
-      if (attemptTime >= oneHourAgo) {
-        companyCounts[attempt.companyName] =
-          (companyCounts[attempt.companyName] || 0) + 1;
-      }
-    });
-
-    return Object.entries(companyCounts)
-      .filter(([_, count]) => (count as number) >= 2)
-      .map(([company]) => company);
-  };
-
   useEffect(() => {
-    const user = JSON.parse(localStorage.getItem("user") || "null");
-    const token = localStorage.getItem("token");
-
-    if (!user?.id || !token) {
+    // ✅ Use context instead of reading localStorage manually
+    if (!isLoggedIn || !user?.id) {
       navigate("/login");
       return;
     }
 
-    // ✅ Using centralized API instead of raw fetch
-    Promise.all([
-      getAptitudeAttempts(user.id),
-      getTechnicalAttempts(user.id)
-    ])
-      .then(async ([aptRes, techRes]) => {
-        const aptData = aptRes.ok ? await aptRes.json() : [];
-        const techData = techRes.ok ? await techRes.json() : [];
-
-        console.log("Aptitude Attempts:", aptData);
-        console.log("Technical Attempts:", techData);
-
-        setAptitudeAttempts(aptData);
-        setTechnicalAttempts(techData);
-        setRateLimitedAptitude(getRateLimited(aptData));
-        setRateLimitedTechnical(getRateLimited(techData));
-      })
-      .catch(err => console.error("Error fetching attempts:", err));
-  }, [navigate]);
-
-  const hasPassedAptitude = (companyName: string) => {
-    return aptitudeAttempts.some(
-      a => a.companyName === companyName && a.passed === true
-    );
-  };
-
-  const hasPassedTechnical = (companyName: string) => {
-    return technicalAttempts.some(
-      a => a.companyName === companyName && a.passed === true
-    );
-  };
+    // ✅ Fetch progress using context's refreshProgress
+    refreshProgress(user.id);
+  }, [isLoggedIn, user?.id]);
 
   const handleLogout = () => {
-    localStorage.removeItem("token");
-    localStorage.removeItem("user");
+    // ✅ Use context logout() instead of manually clearing localStorage
+    logout();
     navigate("/");
   };
 
@@ -123,10 +86,18 @@ const Dashboard = () => {
             </span>
           </Link>
 
-          <Button variant="ghost" size="sm" onClick={handleLogout}>
-            <LogOut className="h-4 w-4 mr-2" />
-            Logout
-          </Button>
+          {/* ✅ Show user's name from context */}
+          <div className="flex items-center gap-4">
+            {user && (
+              <span className="text-sm text-muted-foreground hidden md:block">
+                👋 {user.fullName}
+              </span>
+            )}
+            <Button variant="ghost" size="sm" onClick={handleLogout}>
+              <LogOut className="h-4 w-4 mr-2" />
+              Logout
+            </Button>
+          </div>
         </div>
       </header>
 
@@ -134,7 +105,10 @@ const Dashboard = () => {
 
         {/* Welcome */}
         <div className="mb-12">
-          <h1 className="text-4xl font-bold mb-2">Welcome back, Candidate!</h1>
+          {/* ✅ Show actual user name from context */}
+          <h1 className="text-4xl font-bold mb-2">
+            Welcome back, {user?.fullName?.split(" ")[0] || "Candidate"}!
+          </h1>
           <p className="text-muted-foreground text-lg">
             Choose a company and start your interview simulation
           </p>
@@ -179,69 +153,78 @@ const Dashboard = () => {
           </div>
         </div>
 
-        {/* Companies */}
-        <div>
-          <h2 className="text-2xl font-bold mb-6">Available Companies</h2>
+        {/* ✅ Show loading state while fetching */}
+        {isLoading ? (
+          <div className="text-center py-12 text-muted-foreground">
+            Loading your progress...
+          </div>
+        ) : (
+          <>
+            {/* Companies */}
+            <div>
+              <h2 className="text-2xl font-bold mb-6">Available Companies</h2>
 
-          <div className="grid md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-            {companies.map(company => (
-              <div
-                key={company.id}
-                className="group p-6 rounded-2xl bg-card border-2 border-border hover:border-primary/50 hover:shadow-lg transition-all duration-300"
-              >
-                <div className={`h-16 w-16 rounded-2xl ${company.color} flex items-center justify-center mb-4`}>
-                  <img src={company.logo} alt={company.name} className="h-12 object-contain" />
-                </div>
+              <div className="grid md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+                {companies.map(company => (
+                  <div
+                    key={company.id}
+                    className="group p-6 rounded-2xl bg-card border-2 border-border hover:border-primary/50 hover:shadow-lg transition-all duration-300"
+                  >
+                    <div className={`h-16 w-16 rounded-2xl ${company.color} flex items-center justify-center mb-4`}>
+                      <img src={company.logo} alt={company.name} className="h-12 object-contain" />
+                    </div>
 
-                <h3 className="text-xl font-bold mb-1">{company.name}</h3>
-                <p className="text-sm text-muted-foreground mb-4">{company.role}</p>
+                    <h3 className="text-xl font-bold mb-1">{company.name}</h3>
+                    <p className="text-sm text-muted-foreground mb-4">{company.role}</p>
 
-                {hasPassedTechnical(company.name) ? (
-                  <Button className="w-full" disabled variant="outline">
-                    🎉 Interview Round Coming Soon
-                  </Button>
-                ) : hasPassedAptitude(company.name) ? (
-                  rateLimitedTechnical.includes(company.name) ? (
-                    <Button className="w-full" disabled variant="outline">
-                      🔒 Locked — Try Again in 1 Hour
-                    </Button>
-                  ) : (
-                    <Link to={`/technical-round/${encodeURIComponent(company.name)}`}>
-                      <Button className="w-full">Start Technical Round</Button>
-                    </Link>
-                  )
-                ) : rateLimitedAptitude.includes(company.name) ? (
-                  <Button className="w-full" disabled variant="outline">
-                    🔒 Locked — Try Again in 1 Hour
-                  </Button>
-                ) : (
-                  <Link to={`/aptitude-test/${encodeURIComponent(company.name)}`}>
-                    <Button variant="outline" className="w-full">
-                      Start Aptitude Test
-                    </Button>
-                  </Link>
-                )}
+                    {/* ✅ Using context helper functions */}
+                    {hasPassedTechnical(company.name) ? (
+                      <Button className="w-full" disabled variant="outline">
+                        🎉 Interview Round Coming Soon
+                      </Button>
+                    ) : hasPassedAptitude(company.name) ? (
+                      rateLimitedTechnical.includes(company.name) ? (
+                        <Button className="w-full" disabled variant="outline">
+                          🔒 Locked — Try Again in 1 Hour
+                        </Button>
+                      ) : (
+                        <Link to={`/technical-round/${encodeURIComponent(company.name)}`}>
+                          <Button className="w-full">Start Technical Round</Button>
+                        </Link>
+                      )
+                    ) : rateLimitedAptitude.includes(company.name) ? (
+                      <Button className="w-full" disabled variant="outline">
+                        🔒 Locked — Try Again in 1 Hour
+                      </Button>
+                    ) : (
+                      <Link to={`/aptitude-test/${encodeURIComponent(company.name)}`}>
+                        <Button variant="outline" className="w-full">
+                          Start Aptitude Test
+                        </Button>
+                      </Link>
+                    )}
+                  </div>
+                ))}
               </div>
-            ))}
-          </div>
-        </div>
-
-        {/* Progress */}
-        <div className="mt-12 p-8 rounded-2xl bg-card border border-border">
-          <h2 className="text-2xl font-bold mb-4">Your Progress</h2>
-
-          <div className="flex gap-2">
-            <div className="px-3 py-1 rounded-full bg-muted text-sm">
-              🎯 Aptitude: {aptitudeAttempts.length > 0 ? "Completed" : "Not started"}
             </div>
-            <div className="px-3 py-1 rounded-full bg-muted text-sm">
-              💻 Technical: {passedAptitudeCompanies.length > 0 ? "Unlocked" : "Locked"}
-            </div>
-            <div className="px-3 py-1 rounded-full bg-muted text-sm">🧠 Managerial: Locked</div>
-            <div className="px-3 py-1 rounded-full bg-muted text-sm">🤝 HR: Locked</div>
-          </div>
-        </div>
 
+            {/* Progress */}
+            <div className="mt-12 p-8 rounded-2xl bg-card border border-border">
+              <h2 className="text-2xl font-bold mb-4">Your Progress</h2>
+
+              <div className="flex gap-2">
+                <div className="px-3 py-1 rounded-full bg-muted text-sm">
+                  🎯 Aptitude: {aptitudeAttempts.length > 0 ? "Completed" : "Not started"}
+                </div>
+                <div className="px-3 py-1 rounded-full bg-muted text-sm">
+                  💻 Technical: {passedAptitudeCompanies.length > 0 ? "Unlocked" : "Locked"}
+                </div>
+                <div className="px-3 py-1 rounded-full bg-muted text-sm">🧠 Managerial: Locked</div>
+                <div className="px-3 py-1 rounded-full bg-muted text-sm">🤝 HR: Locked</div>
+              </div>
+            </div>
+          </>
+        )}
       </div>
     </div>
   );

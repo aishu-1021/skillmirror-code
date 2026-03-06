@@ -13,14 +13,15 @@ import {
   CheckCircle,
 } from "lucide-react";
 import { technicalQuestionSets } from "@/data/technicalQuestions";
-// ✅ Import from centralized API
 import { evaluateTechnical } from "@/api/technicalApi";
+// ✅ Import from context
+import { useAuth } from "@/context/AuthContext";
+import { useProgress } from "@/context/ProgressContext";
 
 emailjs.init("MMaLzV-Wvmsya4aWx");
 
 const TECHNICAL_TIME = 20 * 60;
 
-// ✅ Shuffle helper function
 const shuffleArray = <T,>(array: T[]): T[] => {
   const shuffled = [...array];
   for (let i = shuffled.length - 1; i > 0; i--) {
@@ -34,9 +35,13 @@ const TechnicalTest = () => {
   const { companyName } = useParams();
   const navigate = useNavigate();
 
-  const storedUser = JSON.parse(localStorage.getItem("user") || "{}");
-  const userId: number | null = storedUser?.id ?? null;
-  const [email] = useState<string>(storedUser?.email ?? "");
+  // ✅ Get user from AuthContext instead of localStorage
+  const { user, updateUser } = useAuth();
+  const userId: number | null = user?.id ?? null;
+  const [email] = useState<string>(user?.email ?? "");
+
+  // ✅ Get refreshProgress from ProgressContext
+  const { refreshProgress } = useProgress();
 
   const decodedCompany = companyName
     ? decodeURIComponent(companyName)
@@ -143,7 +148,6 @@ const TechnicalTest = () => {
     setIsSendingEmail(true);
 
     try {
-      // ✅ Using centralized API instead of raw fetch
       const res = await evaluateTechnical(
         userId,
         decodedCompany,
@@ -171,14 +175,17 @@ const TechnicalTest = () => {
       setScore(Number(result.percentage.toFixed(2)));
       setSubmitted(true);
 
+      // ✅ Always update + refresh regardless of interviewUnlocked
+      if (user) {
+        updateUser({
+          ...user,
+          technicalPassed: result.passed || false,
+          interviewUnlocked: result.interviewUnlocked || false,
+        });
+      }
+      await refreshProgress(userId);
+
       if (result.interviewUnlocked) {
-        const currentUser = JSON.parse(localStorage.getItem("user") || "{}");
-        const updatedUser = {
-          ...currentUser,
-          technicalPassed: true,
-          interviewUnlocked: true,
-        };
-        localStorage.setItem("user", JSON.stringify(updatedUser));
         navigate("/dashboard");
       }
 
@@ -386,9 +393,9 @@ const TechnicalTest = () => {
                           : "border-border"
                       }`}
                     >
-                      {answers[currentQuestion] === index && (
+                      {answers[currentQuestion] === index && ((
                         <div className="h-2 w-2 rounded-full bg-primary-foreground" />
-                      )}
+                      ))}
                     </div>
                     <span>{option}</span>
                   </div>

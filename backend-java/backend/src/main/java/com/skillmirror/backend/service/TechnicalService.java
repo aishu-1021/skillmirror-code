@@ -52,7 +52,7 @@ public class TechnicalService {
         }
 
         double percentage = ((double) correct / total) * 100;
-        boolean passed = percentage >= 60;
+        boolean passed = percentage >= 75;
         String status = passed ? "PASS" : "FAIL";
 
         // Save attempt

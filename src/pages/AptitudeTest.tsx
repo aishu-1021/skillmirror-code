@@ -9,8 +9,10 @@ import { Target, Clock, ChevronLeft, ChevronRight, Flag, Mail, CheckCircle } fro
 import { useToast } from "@/hooks/use-toast";
 import { getQuestions } from "@/data/companyQuestions";
 import emailjs from "@emailjs/browser";
-// ✅ Import from centralized API
 import { evaluateAptitude } from "@/api/aptitudeApi";
+// ✅ Import from context
+import { useAuth } from "@/context/AuthContext";
+import { useProgress } from "@/context/ProgressContext";
 
 // ✅ Shuffle helper function
 const shuffleArray = <T,>(array: T[]): T[] => {
@@ -27,9 +29,14 @@ const AptitudeTest = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
   const companyName = companyId ? decodeURIComponent(companyId) : "Google";
-  const storedUser = JSON.parse(localStorage.getItem("user") || "{}");
-  const userId: number | null = storedUser?.id ?? null;
-  const [email, setEmail] = useState<string>(storedUser?.email ?? "");
+
+  // ✅ Get user from AuthContext instead of localStorage
+  const { user } = useAuth();
+  const userId: number | null = user?.id ?? null;
+  const [email, setEmail] = useState<string>(user?.email ?? "");
+
+  // ✅ Get refreshProgress from ProgressContext
+  const { refreshProgress } = useProgress();
 
   const rawQuestions = getQuestions(companyName);
 
@@ -171,7 +178,6 @@ const AptitudeTest = () => {
     const weakAreas = analyzeWeakAreas();
 
     try {
-      // ✅ Using centralized API instead of raw fetch
       const evalResponse = await evaluateAptitude(
         userId,
         companyName,
@@ -193,6 +199,9 @@ const AptitudeTest = () => {
         setIsSendingEmail(false);
         return;
       }
+
+      // ✅ Refresh global progress after successful submission
+      if (userId) await refreshProgress(userId);
 
       setResultMessage(
         isPassed
@@ -555,4 +564,5 @@ const AptitudeTest = () => {
     </div>
   );
 };
+
 export default AptitudeTest;

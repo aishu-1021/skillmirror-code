@@ -5,8 +5,9 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Target } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-// ✅ Import from centralized API
 import { loginUser } from "@/api/authApi";
+// ✅ Import useAuth from context
+import { useAuth } from "@/context/AuthContext";
 
 const Login = () => {
   const [email, setEmail] = useState("");
@@ -16,6 +17,8 @@ const Login = () => {
 
   const navigate = useNavigate();
   const { toast } = useToast();
+  // ✅ Get login function from global context
+  const { login } = useAuth();
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -23,7 +26,6 @@ const Login = () => {
     setError(null);
 
     try {
-      // ✅ Using centralized API instead of raw fetch
       const response = await loginUser(email, password);
 
       if (!response.ok) {
@@ -35,11 +37,9 @@ const Login = () => {
       const data = await response.json();
       const { token, user } = data;
 
-      localStorage.setItem("token", token);
-      localStorage.setItem("user", JSON.stringify(user));
-
-      console.log("Logged in user:", user);
-      console.log("Token:", token);
+      // ✅ Use context login() instead of manually setting localStorage
+      // This updates global state AND localStorage in one call
+      login(token, user);
 
       toast({
         title: "Welcome back!",
