@@ -13,6 +13,8 @@ import {
   CheckCircle,
 } from "lucide-react";
 import { technicalQuestionSets } from "@/data/technicalQuestions";
+// ✅ Import from centralized API
+import { evaluateTechnical } from "@/api/technicalApi";
 
 emailjs.init("MMaLzV-Wvmsya4aWx");
 
@@ -33,7 +35,6 @@ const TechnicalTest = () => {
   const navigate = useNavigate();
 
   const storedUser = JSON.parse(localStorage.getItem("user") || "{}");
-  const token = localStorage.getItem("token");
   const userId: number | null = storedUser?.id ?? null;
   const [email] = useState<string>(storedUser?.email ?? "");
 
@@ -43,24 +44,19 @@ const TechnicalTest = () => {
 
   const rawQuestions = technicalQuestionSets[decodedCompany] || [];
 
-  // ✅ Shuffle questions AND options once when component mounts
   const questions = useMemo(() => {
-    // Step 1: Shuffle question order
     const shuffledQuestions = shuffleArray(rawQuestions);
-
-    // Step 2: For each question, shuffle options but track correct answer
     return shuffledQuestions.map(q => {
-      const correctAnswerText = q.options[q.correctAnswer - 1]; // save correct answer text
-      const shuffledOptions = shuffleArray([...q.options]);      // shuffle options
-      const newCorrectIndex = shuffledOptions.indexOf(correctAnswerText) + 1; // find new position
-
+      const correctAnswerText = q.options[q.correctAnswer - 1];
+      const shuffledOptions = shuffleArray([...q.options]);
+      const newCorrectIndex = shuffledOptions.indexOf(correctAnswerText) + 1;
       return {
         ...q,
         options: shuffledOptions,
-        correctAnswer: newCorrectIndex, // update correct answer index
+        correctAnswer: newCorrectIndex,
       };
     });
-  }, [decodedCompany]); // ✅ Re-shuffle only when company changes
+  }, [decodedCompany]);
 
   const [currentQuestion, setCurrentQuestion] = useState(0);
   const [answers, setAnswers] = useState<(number | null)[]>(
@@ -147,23 +143,13 @@ const TechnicalTest = () => {
     setIsSendingEmail(true);
 
     try {
-      const res = await fetch(
-        "http://localhost:8080/api/technical/evaluate",
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            "Authorization": `Bearer ${token}`
-          },
-          body: JSON.stringify({
-            userId,
-            companyName: decodedCompany,
-            // ✅ Uses shuffled correctAnswer to evaluate correctly
-            answers: answers.map((ans, idx) =>
-              ans === questions[idx].correctAnswer - 1 ? 1 : 0
-            ),
-          }),
-        }
+      // ✅ Using centralized API instead of raw fetch
+      const res = await evaluateTechnical(
+        userId,
+        decodedCompany,
+        answers.map((ans, idx) =>
+          ans === questions[idx].correctAnswer - 1 ? 1 : 0
+        )
       );
 
       if (res.status === 429) {
@@ -459,5 +445,4 @@ const TechnicalTest = () => {
     </div>
   );
 };
-
 export default TechnicalTest;

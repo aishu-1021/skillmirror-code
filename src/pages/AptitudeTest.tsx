@@ -9,6 +9,8 @@ import { Target, Clock, ChevronLeft, ChevronRight, Flag, Mail, CheckCircle } fro
 import { useToast } from "@/hooks/use-toast";
 import { getQuestions } from "@/data/companyQuestions";
 import emailjs from "@emailjs/browser";
+// ✅ Import from centralized API
+import { evaluateAptitude } from "@/api/aptitudeApi";
 
 // ✅ Shuffle helper function
 const shuffleArray = <T,>(array: T[]): T[] => {
@@ -26,30 +28,24 @@ const AptitudeTest = () => {
   const { toast } = useToast();
   const companyName = companyId ? decodeURIComponent(companyId) : "Google";
   const storedUser = JSON.parse(localStorage.getItem("user") || "{}");
-  const token = localStorage.getItem("token");
   const userId: number | null = storedUser?.id ?? null;
   const [email, setEmail] = useState<string>(storedUser?.email ?? "");
 
   const rawQuestions = getQuestions(companyName);
 
-  // ✅ Shuffle questions AND their options once when component mounts
   const aptitudeQuestions = useMemo(() => {
-    // Step 1: Shuffle question order
     const shuffledQuestions = shuffleArray(rawQuestions);
-
-    // Step 2: For each question, shuffle its options but track correct answer
     return shuffledQuestions.map(q => {
-      const correctAnswerText = q.options[q.correctAnswer - 1]; // save correct answer text
-      const shuffledOptions = shuffleArray([...q.options]);      // shuffle options
-      const newCorrectIndex = shuffledOptions.indexOf(correctAnswerText) + 1; // find new position
-
+      const correctAnswerText = q.options[q.correctAnswer - 1];
+      const shuffledOptions = shuffleArray([...q.options]);
+      const newCorrectIndex = shuffledOptions.indexOf(correctAnswerText) + 1;
       return {
         ...q,
         options: shuffledOptions,
-        correctAnswer: newCorrectIndex, // update correct answer index
+        correctAnswer: newCorrectIndex,
       };
     });
-  }, [companyName]); // ✅ Re-shuffle only when company changes
+  }, [companyName]);
 
   const [currentQuestion, setCurrentQuestion] = useState(0);
   const [answers, setAnswers] = useState<(number | null)[]>(new Array(aptitudeQuestions.length).fill(null));
@@ -139,7 +135,6 @@ const AptitudeTest = () => {
           }
         }
       });
-
       if (wrongCount > 0) {
         weakCategories.push(`${category} (${wrongCount}/${questionIndices.length} incorrect)`);
       }
@@ -176,22 +171,16 @@ const AptitudeTest = () => {
     const weakAreas = analyzeWeakAreas();
 
     try {
-      const evalResponse = await fetch("http://localhost:8080/api/aptitude/evaluate", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "Authorization": `Bearer ${token}`
-        },
-        body: JSON.stringify({
-          userId: userId,
-          companyName: companyName,
-          answers: answers.map((ans, index) => {
-            if (ans === null) return 0;
-            const correctIndex = aptitudeQuestions[index].correctAnswer - 1;
-            return ans === correctIndex ? 1 : 0;
-          }),
-        }),
-      });
+      // ✅ Using centralized API instead of raw fetch
+      const evalResponse = await evaluateAptitude(
+        userId,
+        companyName,
+        answers.map((ans, index) => {
+          if (ans === null) return 0;
+          const correctIndex = aptitudeQuestions[index].correctAnswer - 1;
+          return ans === correctIndex ? 1 : 0;
+        })
+      );
 
       if (evalResponse.status === 429) {
         const errorData = await evalResponse.json();
@@ -566,5 +555,4 @@ const AptitudeTest = () => {
     </div>
   );
 };
-
 export default AptitudeTest;

@@ -5,6 +5,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Target } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+// ✅ Import from centralized API
+import { loginUser } from "@/api/authApi";
 
 const Login = () => {
   const [email, setEmail] = useState("");
@@ -21,16 +23,8 @@ const Login = () => {
     setError(null);
 
     try {
-      const response = await fetch("http://localhost:8080/api/auth/login", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          email,
-          password,
-        }),
-      });
+      // ✅ Using centralized API instead of raw fetch
+      const response = await loginUser(email, password);
 
       if (!response.ok) {
         const message = await response.text();
@@ -38,13 +32,9 @@ const Login = () => {
         return;
       }
 
-      // ✅ STEP 1: Read backend response (now contains token + user)
       const data = await response.json();
-
-      // ✅ STEP 2: Extract token and user separately
       const { token, user } = data;
 
-      // ✅ STEP 3: Save both to localStorage
       localStorage.setItem("token", token);
       localStorage.setItem("user", JSON.stringify(user));
 
@@ -56,7 +46,6 @@ const Login = () => {
         description: "You've successfully logged in.",
       });
 
-      // ✅ STEP 4: Navigate AFTER saving user
       navigate("/dashboard");
 
     } catch (err) {
@@ -69,7 +58,6 @@ const Login = () => {
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-brand-sky via-background to-brand-sky/30 p-4">
       <div className="w-full max-w-md">
-        {/* Logo */}
         <div className="text-center mb-8">
           <Link to="/" className="inline-flex items-center gap-2 mb-4">
             <div className="h-12 w-12 rounded-xl bg-gradient-to-br from-brand-blue to-brand-light-blue flex items-center justify-center">
@@ -82,7 +70,6 @@ const Login = () => {
           </p>
         </div>
 
-        {/* Login Card */}
         <div className="bg-card rounded-2xl shadow-lg p-8 border border-border">
           <form onSubmit={handleLogin} className="space-y-6">
             {error && (
@@ -141,5 +128,4 @@ const Login = () => {
     </div>
   );
 };
-
 export default Login;

@@ -5,6 +5,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Target } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+// ✅ Import from centralized API
+import { registerUser } from "@/api/authApi";
 
 const Register = () => {
   const [formData, setFormData] = useState({
@@ -37,18 +39,13 @@ const Register = () => {
     setIsLoading(true);
 
     try {
-      const response = await fetch("http://localhost:8080/api/auth/register", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          fullName: formData.fullName,
-          email: formData.email,
-          college: formData.college,
-          password: formData.password,
-        }),
-      });
+      // ✅ Using centralized API instead of raw fetch
+      const response = await registerUser(
+        formData.fullName,
+        formData.email,
+        formData.college,
+        formData.password
+      );
 
       if (!response.ok) {
         const msg = await response.text();
@@ -75,7 +72,6 @@ const Register = () => {
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-brand-sky via-background to-brand-sky/30 p-4">
       <div className="w-full max-w-md">
-        {/* Logo and branding */}
         <div className="text-center mb-8">
           <Link to="/" className="inline-flex items-center gap-2 mb-4">
             <div className="h-12 w-12 rounded-xl bg-gradient-to-br from-brand-blue to-brand-light-blue flex items-center justify-center">
@@ -86,11 +82,10 @@ const Register = () => {
           <p className="text-muted-foreground">Start your interview practice journey today</p>
         </div>
 
-        {/* Registration form */}
         <div className="bg-card rounded-2xl shadow-lg p-8 border border-border">
           <form onSubmit={handleRegister} className="space-y-4">
             <div className="space-y-2">
-              <Label htmlFor="name">Full Name</Label>
+              <Label htmlFor="fullName">Full Name</Label>
               <Input
                 id="fullName"
                 name="fullName"
@@ -174,5 +169,4 @@ const Register = () => {
     </div>
   );
 };
-
 export default Register;

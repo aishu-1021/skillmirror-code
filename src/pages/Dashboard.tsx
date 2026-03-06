@@ -2,7 +2,9 @@ import { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Target, LogOut, TrendingUp, Award, Clock } from "lucide-react";
-
+// Import from centralized API
+import { getAptitudeAttempts } from "@/api/aptitudeApi";
+import { getTechnicalAttempts } from "@/api/technicalApi";
 import googleLogo from "@/assets/google-logo.png";
 import microsoftLogo from "@/assets/microsoft-logo.png";
 import amazonLogo from "@/assets/amazon-logo.png";
@@ -41,7 +43,6 @@ const Dashboard = () => {
     .filter(a => a.passed === true)
     .map(a => a.companyName);
 
-  // ✅ Helper to calculate rate limited companies from attempts
   const getRateLimited = (data: any[]) => {
     const now = new Date();
     const oneHourAgo = new Date(now.getTime() - 60 * 60 * 1000);
@@ -69,12 +70,10 @@ const Dashboard = () => {
       return;
     }
 
-    const headers = { "Authorization": `Bearer ${token}` };
-
-    // ✅ Fetch both aptitude and technical attempts
+    // ✅ Using centralized API instead of raw fetch
     Promise.all([
-      fetch(`http://localhost:8080/api/aptitude/user/${user.id}`, { headers }),
-      fetch(`http://localhost:8080/api/technical/user/${user.id}`, { headers })
+      getAptitudeAttempts(user.id),
+      getTechnicalAttempts(user.id)
     ])
       .then(async ([aptRes, techRes]) => {
         const aptData = aptRes.ok ? await aptRes.json() : [];
@@ -197,14 +196,11 @@ const Dashboard = () => {
                 <h3 className="text-xl font-bold mb-1">{company.name}</h3>
                 <p className="text-sm text-muted-foreground mb-4">{company.role}</p>
 
-                {/* ✅ Full flow: aptitude → technical → locked states for both */}
                 {hasPassedTechnical(company.name) ? (
-                  // Passed technical — show interview button (future)
                   <Button className="w-full" disabled variant="outline">
                     🎉 Interview Round Coming Soon
                   </Button>
                 ) : hasPassedAptitude(company.name) ? (
-                  // Passed aptitude — check if technical is rate limited
                   rateLimitedTechnical.includes(company.name) ? (
                     <Button className="w-full" disabled variant="outline">
                       🔒 Locked — Try Again in 1 Hour
@@ -215,12 +211,10 @@ const Dashboard = () => {
                     </Link>
                   )
                 ) : rateLimitedAptitude.includes(company.name) ? (
-                  // Aptitude rate limited
                   <Button className="w-full" disabled variant="outline">
                     🔒 Locked — Try Again in 1 Hour
                   </Button>
                 ) : (
-                  // Default — start aptitude
                   <Link to={`/aptitude-test/${encodeURIComponent(company.name)}`}>
                     <Button variant="outline" className="w-full">
                       Start Aptitude Test
@@ -252,5 +246,4 @@ const Dashboard = () => {
     </div>
   );
 };
-
 export default Dashboard;
