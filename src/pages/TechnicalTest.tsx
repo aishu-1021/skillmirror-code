@@ -213,8 +213,11 @@ const TechnicalTest = () => {
           score: `${result.correct}/${result.total}`,
           percentage: result.percentage.toFixed(2),
           status: result.passed ? "PASSED" : "FAILED",
-          weak_areas: result.passed ? "None" : analyzeWeakAreas().join(", "),
-          next_round: result.passed ? "Interview Round" : "Not Qualified",
+          // ✅ New fields for HTML template
+          status_color: result.passed ? "#16a34a" : "#dc2626",
+          status_icon: result.passed ? "✅" : "❌",
+          weak_areas: result.passed ? "None — Great job! 🎉" : analyzeWeakAreas().join(", "),
+          next_round: result.passed ? " Interview Round — You are qualified!" : " Not Qualified — Keep practicing!",
           resources: "https://leetcode.com | https://neetcode.io",
         }
       );

@@ -240,10 +240,13 @@ const AptitudeTest = () => {
             score: `${correctCount}/${totalQuestions}`,
             percentage: percentage.toFixed(2),
             status: isPassed ? "PASSED" : "FAILED",
-            weak_areas: isPassed ? "None" : weakAreas.join(", "),
-            next_round: isPassed ? "Technical Round" : "Not Qualified",
+            // New fields for HTML template
+            status_color: isPassed ? "#16a34a" : "#dc2626",
+            status_icon: isPassed ? "✅" : "❌",
+            weak_areas: isPassed ? "None — Great job! 🎉" : weakAreas.join(", "),
+            next_round: isPassed ? " Technical Round — You are qualified!" : " Not Qualified — Keep practicing!",
             resources: isPassed
-              ? "You are eligible for the Technical Round."
+              ? "You are eligible for the Technical Round. Prepare well!"
               : "https://www.indiabix.com | https://www.geeksforgeeks.org/aptitude/"
           },
           "MMaLzV-Wvmsya4aWx"
