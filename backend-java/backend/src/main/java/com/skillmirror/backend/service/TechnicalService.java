@@ -75,9 +75,7 @@ public class TechnicalService {
         if (passed) {
             user.setTechnicalPassed(true);
             user.setInterviewUnlocked(true);
-        } else {
-            user.setTechnicalPassed(false);
-            user.setInterviewUnlocked(false);
+            userRepository.save(user);
         }
 
         userRepository.save(user);

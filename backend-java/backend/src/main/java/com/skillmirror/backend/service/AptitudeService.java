@@ -47,7 +47,7 @@ public class AptitudeService {
         }
 
         double percentage = ((double) correct / total) * 100;
-        boolean passed = percentage >= 80;
+        boolean passed = percentage >= 75;
 
         // Save to database
         AptitudeAttempt attempt = new AptitudeAttempt();
