@@ -178,6 +178,69 @@ const TechnicalTest = () => {
       : "You answered all questions correctly! 🎉";
   };
 
+  // ── Personalized resources based on weak categories ─────────────────
+  // ✅ NEW: replaces generic "https://leetcode.com | https://neetcode.io"
+  const buildPersonalizedResources = () => {
+    const stats = analyzeCategoryBreakdown();
+
+    const resourceMap: { [key: string]: string[] } = {
+      "Algorithms": [
+        "⚡ NeetCode Roadmap: https://neetcode.io/roadmap",
+        "🧩 LeetCode Algorithms: https://leetcode.com/explore/learn/",
+        "📘 GeeksForGeeks Algorithms: https://www.geeksforgeeks.org/fundamentals-of-algorithms/",
+      ],
+      "Data Structures": [
+        "🗂️ NeetCode Data Structures: https://neetcode.io/roadmap",
+        "📚 GeeksForGeeks DSA: https://www.geeksforgeeks.org/data-structures/",
+        "🔗 Visualgo (Visual DSA): https://visualgo.net/en",
+      ],
+      "System Design": [
+        "🏗️ System Design Primer: https://github.com/donnemartin/system-design-primer",
+        "📖 Grokking System Design: https://www.designgurus.io/course/grokking-the-system-design-interview",
+        "🎥 Gaurav Sen YouTube: https://www.youtube.com/@gkcs",
+      ],
+      "Operating Systems": [
+        "🖥️ OS Concepts - GeeksForGeeks: https://www.geeksforgeeks.org/operating-systems/",
+        "📗 OSTEP (Free OS Book): https://pages.cs.wisc.edu/~remzi/OSTEP/",
+        "🎓 Gate Smashers OS: https://www.youtube.com/@GateSmashers",
+      ],
+      "Databases": [
+        "🗄️ SQLZoo Practice: https://sqlzoo.net/",
+        "📊 GeeksForGeeks DBMS: https://www.geeksforgeeks.org/dbms/",
+        "🎓 CMU Database Course: https://15445.courses.cs.cmu.edu/",
+      ],
+      "OOP": [
+        "🧱 GeeksForGeeks OOP: https://www.geeksforgeeks.org/object-oriented-programming-oops-concept-in-java/",
+        "☕ Java OOP - JavaTPoint: https://www.javatpoint.com/java-oops-concepts",
+        "📘 Refactoring Guru (Design Patterns): https://refactoring.guru/design-patterns",
+      ],
+      "General CS": [
+        "💡 CS50 (Free Harvard Course): https://cs50.harvard.edu/",
+        "📖 GeeksForGeeks CS Subjects: https://www.geeksforgeeks.org/computer-science-subjects/",
+        "🎯 InterviewBit CS Fundamentals: https://www.interviewbit.com/courses/programming/",
+      ],
+    };
+
+    const weakResources: string[] = [];
+
+    Object.entries(stats).forEach(([category, data]) => {
+      const pct = (data.correct / data.total) * 100;
+      if (pct < 75) {
+        const key = Object.keys(resourceMap).find(k =>
+          category.toLowerCase() === k.toLowerCase()
+        );
+        if (key && resourceMap[key]) {
+          weakResources.push(`\n📌 ${category} Resources:`);
+          resourceMap[key].forEach(r => weakResources.push(`   ${r}`));
+        }
+      }
+    });
+
+    return weakResources.length > 0
+      ? weakResources.join("\n")
+      : "🎉 Excellent! You performed well across all topics.\n   Keep sharpening at: https://neetcode.io/roadmap";
+  };
+
   const handleSubmit = async () => {
     if (!userId || submitted || submitting) return;
     if (!email || !email.includes("@")) return;
@@ -190,7 +253,6 @@ const TechnicalTest = () => {
     setSubmitting(true);
     setIsSendingEmail(true);
 
-    // ── Build rich responses array ──────────────────────────────────
     const responses = questions.map((q, index) => {
       const correctIndex = q.correctAnswer - 1;
       const userAnswerIndex = answers[index] ?? -1;
@@ -245,6 +307,7 @@ const TechnicalTest = () => {
       const weakAreas = analyzeWeakAreas();
       const categoryBreakdown = buildCategoryBreakdown();
       const wrongAnswersList = buildWrongAnswersList();
+      const personalizedResources = buildPersonalizedResources(); // ✅ NEW
       const userName = user?.fullName || "Candidate";
       const isPassed = result.passed;
 
@@ -273,9 +336,10 @@ const TechnicalTest = () => {
           next_round: isPassed
             ? "✅ Interview Round — You are qualified!"
             : "❌ Not Qualified — Keep practicing!",
+          // ✅ CHANGED: personalized resources instead of generic links
           resources: isPassed
-            ? "You are eligible for the Interview Round. Prepare well!"
-            : "https://leetcode.com | https://neetcode.io",
+            ? "🎉 You are eligible for the Interview Round!\n\n🔥 Keep your skills sharp:\n   💼 LeetCode: https://leetcode.com\n   🗺️ NeetCode Roadmap: https://neetcode.io/roadmap\n   🏗️ System Design Primer: https://github.com/donnemartin/system-design-primer"
+            : personalizedResources,
           wrong_answers: isPassed
             ? "You passed! No wrong answers to review."
             : wrongAnswersList,

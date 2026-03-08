@@ -192,6 +192,54 @@ const AptitudeTest = () => {
       : "You answered all questions correctly! 🎉";
   };
 
+  // ── Personalized resources based on weak categories ─────────────────
+  const buildPersonalizedResources = () => {
+    const stats = analyzeCategoryBreakdown();
+
+    const resourceMap: { [key: string]: string[] } = {
+      "Numerical": [
+        "📐 IndiaBix Quantitative Aptitude: https://www.indiabix.com/aptitude/questions-and-answers/",
+        "📊 Khan Academy Arithmetic: https://www.khanacademy.org/math/arithmetic",
+        "🔢 Testbook Quantitative: https://testbook.com/quantitative-aptitude",
+      ],
+      "Logical Reasoning": [
+        "🧠 IndiaBix Logical Reasoning: https://www.indiabix.com/logical-reasoning/questions-and-answers/",
+        "💡 Brilliant.org Logic Puzzles: https://brilliant.org/courses/logic/",
+        "📝 Testbook Logical Reasoning: https://testbook.com/logical-reasoning",
+      ],
+      "Verbal": [
+        "📖 IndiaBix Verbal Ability: https://www.indiabix.com/verbal-ability/questions-and-answers/",
+        "✍️ Grammarly Handbook: https://www.grammarly.com/blog/category/handbook/",
+        "🗣️ Testbook English: https://testbook.com/english-language",
+      ],
+      "Technical Aptitude": [
+        "💻 GeeksForGeeks CS Fundamentals: https://www.geeksforgeeks.org/fundamentals-of-algorithms/",
+        "🖥️ JavaTPoint Technical: https://www.javatpoint.com/technical-aptitude",
+        "⚙️ IndiaBix Technical: https://www.indiabix.com/technical/",
+      ],
+    };
+
+    const weakResources: string[] = [];
+
+    Object.entries(stats).forEach(([category, data]) => {
+      const pct = (data.correct / data.total) * 100;
+      if (pct < 75) {
+        const key = Object.keys(resourceMap).find(k =>
+          category.toLowerCase().includes(k.toLowerCase()) ||
+          k.toLowerCase().includes(category.toLowerCase())
+        );
+        if (key && resourceMap[key]) {
+          weakResources.push(`\n📌 ${category} Resources:`);
+          resourceMap[key].forEach(r => weakResources.push(`   ${r}`));
+        }
+      }
+    });
+
+    return weakResources.length > 0
+      ? weakResources.join("\n")
+      : "🎉 Great job! You performed well across all categories.\n   Keep practicing at: https://www.indiabix.com";
+  };
+
   const handleSubmit = async () => {
     if (isSubmitted) return;
     if (!userId || aptitudeQuestions.length === 0) return;
@@ -227,6 +275,7 @@ const AptitudeTest = () => {
     const weakAreas = analyzeWeakAreas();
     const categoryBreakdown = buildCategoryBreakdown();
     const wrongAnswersList = buildWrongAnswersList();
+    const personalizedResources = buildPersonalizedResources(); // ✅ NEW
 
     const responses = aptitudeQuestions.map((q, index) => {
       const correctIndex = q.correctAnswer - 1;
@@ -291,9 +340,10 @@ const AptitudeTest = () => {
           next_round: isPassed
             ? "✅ Technical Round — You are qualified!"
             : "❌ Not Qualified — Keep practicing!",
+          // ✅ CHANGED: personalized resources instead of generic links
           resources: isPassed
-            ? "You are eligible for the Technical Round. Prepare well!"
-            : "https://www.indiabix.com | https://www.geeksforgeeks.org/aptitude/",
+            ? "🎉 You are eligible for the Technical Round!\n\n🔥 Start preparing:\n   💻 LeetCode: https://leetcode.com\n   📘 GeeksForGeeks: https://www.geeksforgeeks.org\n   🧠 IndiaBix Technical: https://www.indiabix.com/technical/"
+            : personalizedResources,
           wrong_answers: isPassed
             ? "You passed! No wrong answers to review."
             : wrongAnswersList,
