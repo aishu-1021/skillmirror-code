@@ -8,7 +8,6 @@ import { Label } from "@/components/ui/label";
 import { Target, Clock, ChevronLeft, ChevronRight, Flag, Mail, CheckCircle } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { getQuestions } from "@/data/companyQuestions";
-import emailjs from "@emailjs/browser";
 import { evaluateAptitude } from "@/api/aptitudeApi";
 import { Question } from "@/types";
 import { useAuth } from "@/context/AuthContext";
@@ -33,10 +32,7 @@ const AptitudeTest = () => {
   const userId: number | null = user?.id ?? null;
   const [email, setEmail] = useState<string>(user?.email ?? "");
 
-  // ✅ Get addPracticeTime from ProgressContext
   const { refreshProgress, addPracticeTime } = useProgress();
-
-  // ✅ Track when the test actually started
   const testStartTimeRef = useRef<number | null>(null);
 
   const rawQuestions = getQuestions(companyName);
@@ -73,7 +69,6 @@ const AptitudeTest = () => {
     }
   }, [aptitudeQuestions.length]);
 
-  // ✅ Start tracking time when test begins
   useEffect(() => {
     if (testStarted && !testStartTimeRef.current) {
       testStartTimeRef.current = Date.now();
@@ -121,41 +116,80 @@ const AptitudeTest = () => {
     }
   };
 
-  const analyzeWeakAreas = () => {
-    const questionCategories: { [key: string]: number[] } = {
-      "Speed and Distance": [0, 6],
-      "Percentage and Profit": [1, 3, 15, 23],
-      "Basic Algebra": [2, 8, 26],
-      "Number Series": [4, 12, 24],
-      "Ratio and Proportion": [5, 18],
-      "Average": [7],
-      "Simple and Compound Interest": [13, 17],
-      "Geometry": [14, 25, 29],
-      "Time and Work": [19, 21],
-      "Probability": [22, 28],
-      "Cisterns and Pipes": [16],
-      "Squares and Powers": [27],
-      "Sum of Natural Numbers": [20],
-    };
+  const analyzeCategoryBreakdown = () => {
+    const categoryStats: {
+      [key: string]: { total: number; correct: number; wrong: number };
+    } = {};
 
-    const weakCategories: string[] = [];
-
-    Object.entries(questionCategories).forEach(([category, questionIndices]) => {
-      let wrongCount = 0;
-      questionIndices.forEach(index => {
-        if (index < aptitudeQuestions.length) {
-          const correctIndex = aptitudeQuestions[index].correctAnswer - 1;
-          if (answers[index] !== correctIndex) {
-            wrongCount++;
-          }
-        }
-      });
-      if (wrongCount > 0) {
-        weakCategories.push(`${category} (${wrongCount}/${questionIndices.length} incorrect)`);
+    aptitudeQuestions.forEach((q, index) => {
+      const cat = q.category || "General";
+      if (!categoryStats[cat]) {
+        categoryStats[cat] = { total: 0, correct: 0, wrong: 0 };
+      }
+      categoryStats[cat].total++;
+      const correctIndex = q.correctAnswer - 1;
+      if (answers[index] === correctIndex) {
+        categoryStats[cat].correct++;
+      } else {
+        categoryStats[cat].wrong++;
       }
     });
 
-    return weakCategories.length > 0 ? weakCategories : ["General aptitude concepts"];
+    return categoryStats;
+  };
+
+  const analyzeWeakAreas = () => {
+    const stats = analyzeCategoryBreakdown();
+    const weakCategories: string[] = [];
+
+    Object.entries(stats).forEach(([category, data]) => {
+      if (data.wrong > 0) {
+        weakCategories.push(
+          `${category} (${data.wrong}/${data.total} incorrect)`
+        );
+      }
+    });
+
+    return weakCategories.length > 0 ? weakCategories : ["None — Great job! 🎉"];
+  };
+
+  const buildCategoryBreakdown = () => {
+    const stats = analyzeCategoryBreakdown();
+
+    return Object.entries(stats)
+      .map(([category, data]) => {
+        const pct = Math.round((data.correct / data.total) * 100);
+        const icon = pct >= 75 ? "✅" : pct >= 50 ? "⚠️" : "❌";
+        return `${icon} ${category}: ${data.correct}/${data.total} (${pct}%)`;
+      })
+      .join("\n");
+  };
+
+  const buildWrongAnswersList = () => {
+    const wrongAnswers: string[] = [];
+
+    aptitudeQuestions.forEach((q, index) => {
+      const correctIndex = q.correctAnswer - 1;
+      const userAnswer = answers[index];
+
+      if (userAnswer === null || userAnswer !== correctIndex) {
+        const userAnswerText =
+          userAnswer === null ? "Not answered" : q.options[userAnswer];
+        const correctAnswerText = q.options[correctIndex];
+        const explanation = q.explanation || "Review this topic further.";
+
+        wrongAnswers.push(
+          `❓ Q${index + 1}: ${q.question}\n` +
+          `   ✗ Your answer: ${userAnswerText}\n` +
+          `   ✓ Correct answer: ${correctAnswerText}\n` +
+          `   💡 Why: ${explanation}`
+        );
+      }
+    });
+
+    return wrongAnswers.length > 0
+      ? wrongAnswers.join("\n\n")
+      : "You answered all questions correctly! 🎉";
   };
 
   const handleSubmit = async () => {
@@ -171,7 +205,6 @@ const AptitudeTest = () => {
       return;
     }
 
-    // ✅ Calculate time spent and save to practice tracker
     if (testStartTimeRef.current && userId) {
       const secondsSpent = Math.floor(
         (Date.now() - testStartTimeRef.current) / 1000
@@ -192,17 +225,27 @@ const AptitudeTest = () => {
 
     const isPassed = percentage >= CUTOFF_PERCENTAGE;
     const weakAreas = analyzeWeakAreas();
+    const categoryBreakdown = buildCategoryBreakdown();
+    const wrongAnswersList = buildWrongAnswersList();
+
+    const responses = aptitudeQuestions.map((q, index) => {
+      const correctIndex = q.correctAnswer - 1;
+      const userAnswerIndex = answers[index] ?? -1;
+
+      return {
+        questionIndex: index,
+        selectedOption: userAnswerIndex,
+        correctOption: correctIndex,
+        questionText: q.question,
+        selectedOptionText:
+          userAnswerIndex === -1 ? "Not answered" : q.options[userAnswerIndex],
+        correctOptionText: q.options[correctIndex],
+        explanation: q.explanation || "Review this topic further.",
+      };
+    });
 
     try {
-      const evalResponse = await evaluateAptitude(
-        userId,
-        companyName,
-        answers.map((ans, index) => {
-          if (ans === null) return 0;
-          const correctIndex = aptitudeQuestions[index].correctAnswer - 1;
-          return ans === correctIndex ? 1 : 0;
-        })
-      );
+      const evalResponse = await evaluateAptitude(responses, companyName, userId);
 
       if (evalResponse.status === 429) {
         const errorData = await evalResponse.json();
@@ -224,31 +267,43 @@ const AptitudeTest = () => {
           : "You did not clear the Aptitude Round. Focus on your weak areas and try again 💪"
       );
 
+      const userName = user?.fullName || "Candidate";
+
       try {
+        const emailPayload: Record<string, string> = {
+          to_email: email,
+          from_name: "SkillMirror",
+          candidate_name: userName,
+          subject: isPassed
+            ? "SkillMirror Aptitude Test – Qualified for Technical Round"
+            : "SkillMirror Aptitude Test – Performance Analysis",
+          message: isPassed
+            ? `Congratulations! You have cleared the Aptitude Round for ${companyName}.`
+            : `Thank you for taking the Aptitude Test for ${companyName}. Here is your detailed performance analysis.`,
+          score: `${correctCount}/${totalQuestions}`,
+          percentage: percentage.toFixed(2),
+          status: isPassed ? "PASSED" : "FAILED",
+          status_color: isPassed ? "#16a34a" : "#dc2626",
+          status_icon: isPassed ? "✅" : "❌",
+          weak_areas: isPassed
+            ? `All categories passed! 🎉\n\n${categoryBreakdown}`
+            : `${weakAreas.join("\n")}\n\n📊 Full Breakdown:\n${categoryBreakdown}`,
+          next_round: isPassed
+            ? "✅ Technical Round — You are qualified!"
+            : "❌ Not Qualified — Keep practicing!",
+          resources: isPassed
+            ? "You are eligible for the Technical Round. Prepare well!"
+            : "https://www.indiabix.com | https://www.geeksforgeeks.org/aptitude/",
+          wrong_answers: isPassed
+            ? "You passed! No wrong answers to review."
+            : wrongAnswersList,
+        };
+
+        const { default: emailjs } = await import("@emailjs/browser");
         await emailjs.send(
           "service_qmge4ea",
           "template_tkihh98",
-          {
-            to_email: email,
-            from_name: "SkillMirror",
-            subject: isPassed
-              ? "SkillMirror Aptitude Test – Qualified for Technical Round"
-              : "SkillMirror Aptitude Test – Performance Analysis",
-            message: isPassed
-              ? `Congratulations! You have cleared the Aptitude Round for ${companyName}.`
-              : `Thank you for taking the Aptitude Test for ${companyName}. Here is your detailed performance analysis.`,
-            score: `${correctCount}/${totalQuestions}`,
-            percentage: percentage.toFixed(2),
-            status: isPassed ? "PASSED" : "FAILED",
-            // New fields for HTML template
-            status_color: isPassed ? "#16a34a" : "#dc2626",
-            status_icon: isPassed ? "✅" : "❌",
-            weak_areas: isPassed ? "None — Great job! 🎉" : weakAreas.join(", "),
-            next_round: isPassed ? " Technical Round — You are qualified!" : " Not Qualified — Keep practicing!",
-            resources: isPassed
-              ? "You are eligible for the Technical Round. Prepare well!"
-              : "https://www.indiabix.com | https://www.geeksforgeeks.org/aptitude/"
-          },
+          emailPayload,
           "MMaLzV-Wvmsya4aWx"
         );
 
@@ -419,7 +474,10 @@ const AptitudeTest = () => {
                   <p className="text-sm text-muted-foreground">The email includes:</p>
                   <ul className="text-sm text-muted-foreground mt-2 space-y-1">
                     <li>✓ Your complete test score and percentage</li>
-                    <li>✓ Detailed analysis of your weak areas</li>
+                    <li>✓ Score breakdown by category (Logical, Numerical, Verbal, Technical)</li>
+                    <li>✓ Weak areas with detailed category analysis</li>
+                    <li>✓ Every wrong question with your answer vs correct answer</li>
+                    <li>✓ Explanation for each wrong answer</li>
                     <li>✓ Personalized learning resources and recommendations</li>
                     <li>✓ Next steps based on your performance</li>
                   </ul>

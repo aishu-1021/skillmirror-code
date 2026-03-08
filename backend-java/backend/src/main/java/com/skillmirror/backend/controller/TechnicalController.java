@@ -21,19 +21,20 @@ public class TechnicalController {
     @PostMapping("/evaluate")
     public Map<String, Object> evaluateTechnical(
             @RequestBody Map<String, Object> data) {
+
         Long userId = Long.valueOf(data.get("userId").toString());
         String companyName = data.get("companyName").toString();
-        List<Integer> answers = (List<Integer>) data.get("answers");
 
-        return technicalService.evaluate(userId, companyName, answers);
+        // Now receives rich responses list instead of flat answers list
+        List<Map<String, Object>> responses =
+                (List<Map<String, Object>>) data.get("responses");
+
+        return technicalService.evaluate(userId, companyName, responses);
     }
 
-    //This was missing — Dashboard needs it to fetch technical attempts
     @GetMapping("/user/{userId}")
     public ResponseEntity<List<TechnicalAttempt>> getAttemptsByUser(
             @PathVariable Long userId) {
-        List<TechnicalAttempt> attempts =
-                technicalService.getAttemptsByUser(userId);
-        return ResponseEntity.ok(attempts);
+        return ResponseEntity.ok(technicalService.getAttemptsByUser(userId));
     }
 }

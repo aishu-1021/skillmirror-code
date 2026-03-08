@@ -1,22 +1,29 @@
 import { apiFetch } from "./apiClient";
-// Evaluate aptitude test answers
+export interface QuestionAnswerDTO {
+  questionIndex: number;
+  selectedOption: number;
+  correctOption: number;
+  questionText: string;
+  selectedOptionText: string;
+  correctOptionText: string;
+  explanation: string;
+}
+
 export const evaluateAptitude = async (
-  userId: number,
+  responses: QuestionAnswerDTO[],
   companyName: string,
-  answers: number[]
+  userId: number
 ) => {
   const response = await apiFetch(
     "/api/aptitude/evaluate",
     {
       method: "POST",
-      body: JSON.stringify({ userId, companyName, answers }),
+      body: JSON.stringify({ userId, companyName, responses }),
     }
   );
 
   return response;
 };
-
-// Get all aptitude attempts for a user
 export const getAptitudeAttempts = async (userId: number) => {
   const response = await apiFetch(
     `/api/aptitude/user/${userId}`,
@@ -24,6 +31,5 @@ export const getAptitudeAttempts = async (userId: number) => {
       method: "GET",
     }
   );
-
   return response;
 };

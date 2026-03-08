@@ -1,4 +1,6 @@
 package com.skillmirror.backend.entity;
+
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.persistence.*;
 import java.time.LocalDateTime;
 import java.util.List;
@@ -19,9 +21,14 @@ public class AptitudeAttempt {
     private double percentage;
     private boolean passed;
 
-    @ElementCollection
-    private List<Integer> answers;
-
+    @OneToMany(
+            mappedBy = "aptitudeAttempt",
+            cascade = CascadeType.ALL,
+            fetch = FetchType.LAZY,
+            orphanRemoval = true
+    )
+    @JsonIgnore
+    private List<QuestionResponse> questionResponses;
 
     private LocalDateTime attemptedAt;
 
@@ -79,12 +86,12 @@ public class AptitudeAttempt {
         this.passed = passed;
     }
 
-    public List<Integer> getAnswers() {
-        return answers;
+    public List<QuestionResponse> getQuestionResponses() {
+        return questionResponses;
     }
 
-    public void setAnswers(List<Integer> answers) {
-        this.answers = answers;
+    public void setQuestionResponses(List<QuestionResponse> questionResponses) {
+        this.questionResponses = questionResponses;
     }
 
     public LocalDateTime getAttemptedAt() {

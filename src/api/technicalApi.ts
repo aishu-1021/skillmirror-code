@@ -1,29 +1,33 @@
 import { apiFetch } from "./apiClient";
-// Evaluate technical test answers
+export interface TechnicalQuestionAnswerDTO {
+  questionIndex: number;
+  selectedOption: number;
+  correctOption: number;
+  questionText: string;
+  selectedOptionText: string;
+  correctOptionText: string;
+  explanation: string;
+}
+
 export const evaluateTechnical = async (
   userId: number,
   companyName: string,
-  answers: number[]
+  responses: TechnicalQuestionAnswerDTO[]
 ) => {
   const response = await apiFetch(
     "/api/technical/evaluate",
     {
       method: "POST",
-      body: JSON.stringify({ userId, companyName, answers }),
+      body: JSON.stringify({ userId, companyName, responses }),
     }
   );
-
   return response;
 };
 
-// Get all technical attempts for a user
 export const getTechnicalAttempts = async (userId: number) => {
   const response = await apiFetch(
     `/api/technical/user/${userId}`,
-    {
-      method: "GET",
-    }
+    { method: "GET" }
   );
-
   return response;
 };

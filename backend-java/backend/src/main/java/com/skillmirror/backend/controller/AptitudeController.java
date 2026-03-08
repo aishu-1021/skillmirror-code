@@ -1,8 +1,8 @@
 package com.skillmirror.backend.controller;
+import com.skillmirror.backend.dto.AptitudeSubmitRequest;
 import com.skillmirror.backend.entity.AptitudeAttempt;
 import com.skillmirror.backend.service.AptitudeService;
 import org.springframework.web.bind.annotation.*;
-
 import java.util.List;
 import java.util.Map;
 
@@ -18,12 +18,8 @@ public class AptitudeController {
     }
 
     @PostMapping("/evaluate")
-    public Map<String, Object> evaluate(@RequestBody Map<String, Object> data) {
-        Long userId = Long.valueOf(data.get("userId").toString());
-        String companyName = data.get("companyName").toString();
-        List<Integer> answers = (List<Integer>) data.get("answers");
-
-        return aptitudeService.evaluate(userId, companyName, answers);
+    public Map<String, Object> evaluate(@RequestBody AptitudeSubmitRequest request) {
+        return aptitudeService.evaluate(request);
     }
 
     @GetMapping("/user/{userId}")

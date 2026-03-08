@@ -1,24 +1,16 @@
-import emailjs from "@emailjs/browser";
 import { useState, useEffect, useRef, useMemo } from "react";
 import { useParams, useNavigate, Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { Card } from "@/components/ui/card";
 import {
-  Target,
-  Clock,
-  ChevronLeft,
-  ChevronRight,
-  Flag,
-  CheckCircle,
+  Target, Clock, ChevronLeft, ChevronRight, Flag, CheckCircle,
 } from "lucide-react";
 import { technicalQuestionSets } from "@/data/technicalQuestions";
 import { evaluateTechnical } from "@/api/technicalApi";
 import { Question } from "@/types";
 import { useAuth } from "@/context/AuthContext";
 import { useProgress } from "@/context/ProgressContext";
-
-emailjs.init("MMaLzV-Wvmsya4aWx");
 
 const TECHNICAL_TIME = 20 * 60;
 
@@ -39,10 +31,7 @@ const TechnicalTest = () => {
   const userId: number | null = user?.id ?? null;
   const [email] = useState<string>(user?.email ?? "");
 
-  // ✅ Get addPracticeTime from ProgressContext
   const { refreshProgress, addPracticeTime } = useProgress();
-
-  // ✅ Track when the test started
   const testStartTimeRef = useRef<number>(Date.now());
 
   const decodedCompany = companyName
@@ -77,7 +66,6 @@ const TechnicalTest = () => {
   const [isRateLimited, setIsRateLimited] = useState(false);
   const [rateLimitMessage, setRateLimitMessage] = useState("");
 
-  /* Reset */
   useEffect(() => {
     if (questions.length === 0) return;
     setAnswers(new Array(questions.length).fill(null));
@@ -85,28 +73,20 @@ const TechnicalTest = () => {
     setTimeLeft(TECHNICAL_TIME);
     setSubmitted(false);
     setScore(0);
-    // ✅ Reset start time when company changes
     testStartTimeRef.current = Date.now();
   }, [decodedCompany]);
 
-  /* Timer */
   useEffect(() => {
     if (submitted || timeLeft === 0) return;
-
     const timer = setInterval(() => {
       setTimeLeft((prev) => {
-        if (prev <= 1) {
-          clearInterval(timer);
-          return 0;
-        }
+        if (prev <= 1) { clearInterval(timer); return 0; }
         return prev - 1;
       });
     }, 1000);
-
     return () => clearInterval(timer);
   }, [submitted, timeLeft]);
 
-  /* Auto submit */
   useEffect(() => {
     if (timeLeft === 0 && !submitted && !submitting) {
       handleSubmit();
@@ -126,29 +106,82 @@ const TechnicalTest = () => {
   };
 
   const handleNext = () => {
-    if (currentQuestion < questions.length - 1) {
+    if (currentQuestion < questions.length - 1)
       setCurrentQuestion((q) => q + 1);
-    }
   };
 
   const handlePrevious = () => {
-    if (currentQuestion > 0) {
+    if (currentQuestion > 0)
       setCurrentQuestion((q) => q - 1);
-    }
   };
 
-  const analyzeWeakAreas = () =>
-    questions
-      .map((q, idx) =>
-        answers[idx] !== q.correctAnswer - 1 ? q.question : null
-      )
-      .filter(Boolean);
+  // ── Category breakdown ──────────────────────────────────────────────
+  const analyzeCategoryBreakdown = () => {
+    const categoryStats: {
+      [key: string]: { total: number; correct: number; wrong: number };
+    } = {};
+    questions.forEach((q, index) => {
+      const cat = q.category || "General";
+      if (!categoryStats[cat])
+        categoryStats[cat] = { total: 0, correct: 0, wrong: 0 };
+      categoryStats[cat].total++;
+      if (answers[index] === q.correctAnswer - 1)
+        categoryStats[cat].correct++;
+      else
+        categoryStats[cat].wrong++;
+    });
+    return categoryStats;
+  };
+
+  const analyzeWeakAreas = () => {
+    const stats = analyzeCategoryBreakdown();
+    const weakCategories: string[] = [];
+    Object.entries(stats).forEach(([category, data]) => {
+      if (data.wrong > 0)
+        weakCategories.push(`${category} (${data.wrong}/${data.total} incorrect)`);
+    });
+    return weakCategories.length > 0 ? weakCategories : ["None — Great job! 🎉"];
+  };
+
+  const buildCategoryBreakdown = () => {
+    const stats = analyzeCategoryBreakdown();
+    return Object.entries(stats)
+      .map(([category, data]) => {
+        const pct = Math.round((data.correct / data.total) * 100);
+        const icon = pct >= 75 ? "✅" : pct >= 50 ? "⚠️" : "❌";
+        return `${icon} ${category}: ${data.correct}/${data.total} (${pct}%)`;
+      })
+      .join("\n");
+  };
+
+  // ── Wrong answers list for email ────────────────────────────────────
+  const buildWrongAnswersList = () => {
+    const wrongAnswers: string[] = [];
+    questions.forEach((q, index) => {
+      const correctIndex = q.correctAnswer - 1;
+      const userAnswer = answers[index];
+      if (userAnswer === null || userAnswer !== correctIndex) {
+        const userAnswerText =
+          userAnswer === null ? "Not answered" : q.options[userAnswer];
+        const correctAnswerText = q.options[correctIndex];
+        const explanation = q.explanation || "Review this topic further.";
+        wrongAnswers.push(
+          `❓ Q${index + 1}: ${q.question}\n` +
+          `   ✗ Your answer: ${userAnswerText}\n` +
+          `   ✓ Correct answer: ${correctAnswerText}\n` +
+          `   💡 Why: ${explanation}`
+        );
+      }
+    });
+    return wrongAnswers.length > 0
+      ? wrongAnswers.join("\n\n")
+      : "You answered all questions correctly! 🎉";
+  };
 
   const handleSubmit = async () => {
     if (!userId || submitted || submitting) return;
     if (!email || !email.includes("@")) return;
 
-    // ✅ Calculate time spent and save to practice tracker
     const secondsSpent = Math.floor(
       (Date.now() - testStartTimeRef.current) / 1000
     );
@@ -157,14 +190,24 @@ const TechnicalTest = () => {
     setSubmitting(true);
     setIsSendingEmail(true);
 
+    // ── Build rich responses array ──────────────────────────────────
+    const responses = questions.map((q, index) => {
+      const correctIndex = q.correctAnswer - 1;
+      const userAnswerIndex = answers[index] ?? -1;
+      return {
+        questionIndex: index,
+        selectedOption: userAnswerIndex,
+        correctOption: correctIndex,
+        questionText: q.question,
+        selectedOptionText:
+          userAnswerIndex === -1 ? "Not answered" : q.options[userAnswerIndex],
+        correctOptionText: q.options[correctIndex],
+        explanation: q.explanation || "Review this topic further.",
+      };
+    });
+
     try {
-      const res = await evaluateTechnical(
-        userId,
-        decodedCompany,
-        answers.map((ans, idx) =>
-          ans === questions[idx].correctAnswer - 1 ? 1 : 0
-        )
-      );
+      const res = await evaluateTechnical(userId, decodedCompany, responses);
 
       if (res.status === 429) {
         const errorData = await res.json();
@@ -198,29 +241,48 @@ const TechnicalTest = () => {
         navigate("/dashboard");
       }
 
+      // ── Build email data ──────────────────────────────────────────
+      const weakAreas = analyzeWeakAreas();
+      const categoryBreakdown = buildCategoryBreakdown();
+      const wrongAnswersList = buildWrongAnswersList();
+      const userName = user?.fullName || "Candidate";
+      const isPassed = result.passed;
+
+      const { default: emailjs } = await import("@emailjs/browser");
       await emailjs.send(
         "service_qmge4ea",
         "template_tkihh98",
         {
           to_email: email,
           from_name: "SkillMirror",
-          subject: result.passed
+          candidate_name: userName,
+          subject: isPassed
             ? "SkillMirror Technical Round – Qualified for Interview Round"
             : "SkillMirror Technical Round – Performance Analysis",
-          message: result.passed
+          message: isPassed
             ? `Congratulations! You cleared the Technical Round for ${decodedCompany}.`
-            : `Thank you for attempting the Technical Round for ${decodedCompany}.`,
+            : `Thank you for attempting the Technical Round for ${decodedCompany}. Here is your detailed performance analysis.`,
           score: `${result.correct}/${result.total}`,
           percentage: result.percentage.toFixed(2),
-          status: result.passed ? "PASSED" : "FAILED",
-          // ✅ New fields for HTML template
-          status_color: result.passed ? "#16a34a" : "#dc2626",
-          status_icon: result.passed ? "✅" : "❌",
-          weak_areas: result.passed ? "None — Great job! 🎉" : analyzeWeakAreas().join(", "),
-          next_round: result.passed ? " Interview Round — You are qualified!" : " Not Qualified — Keep practicing!",
-          resources: "https://leetcode.com | https://neetcode.io",
-        }
+          status: isPassed ? "PASSED" : "FAILED",
+          status_color: isPassed ? "#16a34a" : "#dc2626",
+          status_icon: isPassed ? "✅" : "❌",
+          weak_areas: isPassed
+            ? `All categories passed! 🎉\n\n${categoryBreakdown}`
+            : `${weakAreas.join("\n")}\n\n📊 Full Breakdown:\n${categoryBreakdown}`,
+          next_round: isPassed
+            ? "✅ Interview Round — You are qualified!"
+            : "❌ Not Qualified — Keep practicing!",
+          resources: isPassed
+            ? "You are eligible for the Interview Round. Prepare well!"
+            : "https://leetcode.com | https://neetcode.io",
+          wrong_answers: isPassed
+            ? "You passed! No wrong answers to review."
+            : wrongAnswersList,
+        },
+        "MMaLzV-Wvmsya4aWx"
       );
+
     } catch (err) {
       console.error(err);
     } finally {
@@ -231,9 +293,7 @@ const TechnicalTest = () => {
 
   const answeredCount = answers.filter((a) => a !== null).length;
   const progress =
-    questions.length === 0
-      ? 0
-      : (answeredCount / questions.length) * 100;
+    questions.length === 0 ? 0 : (answeredCount / questions.length) * 100;
 
   if (isRateLimited) {
     return (
@@ -243,17 +303,11 @@ const TechnicalTest = () => {
             <div className="h-20 w-20 rounded-full bg-destructive/10 flex items-center justify-center mx-auto mb-4">
               <span className="text-4xl">🔒</span>
             </div>
-            <h1 className="text-3xl font-bold mb-2 text-destructive">
-              Test Locked
-            </h1>
-            <p className="text-muted-foreground">
-              {decodedCompany} - Technical Test
-            </p>
+            <h1 className="text-3xl font-bold mb-2 text-destructive">Test Locked</h1>
+            <p className="text-muted-foreground">{decodedCompany} - Technical Test</p>
           </div>
           <div className="p-6 bg-destructive/5 border border-destructive/20 rounded-lg mb-6">
-            <p className="text-lg font-semibold text-destructive mb-2">
-              Too Many Attempts!
-            </p>
+            <p className="text-lg font-semibold text-destructive mb-2">Too Many Attempts!</p>
             <p className="text-muted-foreground">{rateLimitMessage}</p>
           </div>
           <Button onClick={() => navigate("/dashboard")} className="w-full">
@@ -272,19 +326,13 @@ const TechnicalTest = () => {
             <div className="h-20 w-20 rounded-full bg-primary/10 flex items-center justify-center mx-auto mb-4">
               <CheckCircle className="h-10 w-10 text-primary" />
             </div>
-            <h1 className="text-3xl font-bold mb-2">
-              Technical Round Completed
-            </h1>
-            <p className="text-muted-foreground">
-              {decodedCompany} – Technical Test
-            </p>
+            <h1 className="text-3xl font-bold mb-2">Technical Round Completed</h1>
+            <p className="text-muted-foreground">{decodedCompany} – Technical Test</p>
           </div>
-
           <div className="p-6 bg-primary/5 border border-primary/20 rounded-lg mb-6">
             <p className="text-lg font-semibold">Your Score: {score}%</p>
             <p className="text-sm text-muted-foreground mt-2">
-              ({Math.round((score / 100) * questions.length)} /{" "}
-              {questions.length} correct)
+              ({Math.round((score / 100) * questions.length)} / {questions.length} correct)
             </p>
             {isSendingEmail && (
               <p className="text-sm text-muted-foreground mt-2 animate-pulse">
@@ -292,7 +340,6 @@ const TechnicalTest = () => {
               </p>
             )}
           </div>
-
           <div className="flex gap-3 justify-center">
             <Button variant="outline" onClick={() => navigate("/dashboard")}>
               Back to Dashboard
@@ -333,25 +380,16 @@ const TechnicalTest = () => {
               </Link>
               <div className="h-6 w-px bg-border" />
               <div>
-                <div className="text-sm text-muted-foreground">
-                  Technical Test
-                </div>
+                <div className="text-sm text-muted-foreground">Technical Test</div>
                 <div className="font-semibold">{decodedCompany}</div>
               </div>
             </div>
-
             <div className="flex items-center gap-4">
-              <div
-                className={`flex items-center gap-2 px-4 py-2 rounded-full ${
-                  timeLeft < 300
-                    ? "bg-destructive/10 text-destructive"
-                    : "bg-muted"
-                }`}
-              >
+              <div className={`flex items-center gap-2 px-4 py-2 rounded-full ${
+                timeLeft < 300 ? "bg-destructive/10 text-destructive" : "bg-muted"
+              }`}>
                 <Clock className="h-4 w-4" />
-                <span className="font-mono font-semibold">
-                  {formatTime(timeLeft)}
-                </span>
+                <span className="font-mono font-semibold">{formatTime(timeLeft)}</span>
               </div>
               <Button onClick={handleSubmit} size="sm" disabled={submitting}>
                 <Flag className="h-4 w-4 mr-2" />
@@ -368,9 +406,7 @@ const TechnicalTest = () => {
             <span className="text-sm font-medium">
               Progress: {answeredCount}/{questions.length} answered
             </span>
-            <span className="text-sm text-muted-foreground">
-              {progress.toFixed(0)}%
-            </span>
+            <span className="text-sm text-muted-foreground">{progress.toFixed(0)}%</span>
           </div>
           <Progress value={progress} className="h-2" />
         </div>
@@ -384,57 +420,43 @@ const TechnicalTest = () => {
               {questions[currentQuestion]?.question}
             </h2>
           </div>
-
           <div className="space-y-3">
-            {questions[currentQuestion]?.options.map(
-              (option: string, index: number) => (
-                <button
-                  key={index}
-                  onClick={() => handleAnswerSelect(index)}
-                  className={`w-full p-4 rounded-xl border-2 text-left transition-all ${
+            {questions[currentQuestion]?.options.map((option: string, index: number) => (
+              <button
+                key={index}
+                onClick={() => handleAnswerSelect(index)}
+                className={`w-full p-4 rounded-xl border-2 text-left transition-all ${
+                  answers[currentQuestion] === index
+                    ? "border-primary bg-primary/5"
+                    : "border-border hover:border-primary/50"
+                }`}
+              >
+                <div className="flex items-center gap-3">
+                  <div className={`h-6 w-6 rounded-full border-2 flex items-center justify-center ${
                     answers[currentQuestion] === index
-                      ? "border-primary bg-primary/5"
-                      : "border-border hover:border-primary/50"
-                  }`}
-                >
-                  <div className="flex items-center gap-3">
-                    <div
-                      className={`h-6 w-6 rounded-full border-2 flex items-center justify-center ${
-                        answers[currentQuestion] === index
-                          ? "border-primary bg-primary"
-                          : "border-border"
-                      }`}
-                    >
-                      {answers[currentQuestion] === index && (
-                        <div className="h-2 w-2 rounded-full bg-primary-foreground" />
-                      )}
-                    </div>
-                    <span>{option}</span>
+                      ? "border-primary bg-primary"
+                      : "border-border"
+                  }`}>
+                    {answers[currentQuestion] === index && (
+                      <div className="h-2 w-2 rounded-full bg-primary-foreground" />
+                    )}
                   </div>
-                </button>
-              )
-            )}
+                  <span>{option}</span>
+                </div>
+              </button>
+            ))}
           </div>
         </Card>
 
         <div className="flex items-center justify-between">
-          <Button
-            variant="outline"
-            onClick={handlePrevious}
-            disabled={currentQuestion === 0}
-          >
+          <Button variant="outline" onClick={handlePrevious} disabled={currentQuestion === 0}>
             <ChevronLeft className="h-4 w-4 mr-2" />
             Previous
           </Button>
-
           <div className="text-sm text-muted-foreground">
             Question {currentQuestion + 1} / {questions.length}
           </div>
-
-          <Button
-            onClick={handleNext}
-            disabled={currentQuestion === questions.length - 1}
-          >
+          <Button onClick={handleNext} disabled={currentQuestion === questions.length - 1}>
             Next
             <ChevronRight className="h-4 w-4 ml-2" />
           </Button>

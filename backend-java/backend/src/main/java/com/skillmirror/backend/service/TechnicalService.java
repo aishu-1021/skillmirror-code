@@ -1,5 +1,4 @@
 package com.skillmirror.backend.service;
-
 import com.skillmirror.backend.entity.TechnicalAttempt;
 import com.skillmirror.backend.entity.User;
 import com.skillmirror.backend.repository.TechnicalAttemptRepository;
@@ -19,7 +18,6 @@ public class TechnicalService {
     private final TechnicalAttemptRepository repository;
     private final UserRepository userRepository;
 
-    //Max 2 attempts per company per hour
     private static final int MAX_ATTEMPTS_PER_HOUR = 2;
 
     public TechnicalService(TechnicalAttemptRepository repository,
@@ -29,9 +27,9 @@ public class TechnicalService {
     }
 
     public Map<String, Object> evaluate(Long userId, String companyName,
-                                        List<Integer> answers) {
+                                        List<Map<String, Object>> responses) {
 
-        //RATE LIMITING CHECK
+        // Rate limiting check — unchanged
         LocalDateTime oneHourAgo = LocalDateTime.now().minusHours(1);
         long recentAttempts = repository
                 .countRecentAttempts(userId, companyName, oneHourAgo);
@@ -44,11 +42,14 @@ public class TechnicalService {
             );
         }
 
-        int total = answers.size();
+        int total = responses.size();
         int correct = 0;
 
-        for (int a : answers) {
-            if (a == 1) correct++;
+        // Score by comparing selectedOption == correctOption
+        for (Map<String, Object> r : responses) {
+            int selected = ((Number) r.get("selectedOption")).intValue();
+            int correctOpt = ((Number) r.get("correctOption")).intValue();
+            if (selected == correctOpt) correct++;
         }
 
         double percentage = ((double) correct / total) * 100;
@@ -65,19 +66,16 @@ public class TechnicalService {
         attempt.setStatus(status);
         attempt.setAttemptedAt(LocalDateTime.now());
         attempt.setPassed(passed);
-
         repository.save(attempt);
 
-        // Update user progression
+        // Update user progression — unchanged
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new RuntimeException("User not found"));
 
         if (passed) {
             user.setTechnicalPassed(true);
             user.setInterviewUnlocked(true);
-            userRepository.save(user);
         }
-
         userRepository.save(user);
 
         // Build response
