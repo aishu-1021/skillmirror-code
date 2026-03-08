@@ -5,13 +5,14 @@ import { Progress } from "@/components/ui/progress";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Target, Clock, ChevronLeft, ChevronRight, Flag, Mail, CheckCircle } from "lucide-react";
+import { Target, Clock, ChevronLeft, ChevronRight, Flag, Mail } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { getQuestions } from "@/data/companyQuestions";
 import { evaluateAptitude } from "@/api/aptitudeApi";
 import { Question } from "@/types";
 import { useAuth } from "@/context/AuthContext";
 import { useProgress } from "@/context/ProgressContext";
+import type { AptitudeResultsState } from "./AptitudeResults";
 
 const shuffleArray = <T,>(array: T[]): T[] => {
   const shuffled = [...array];
@@ -52,9 +53,6 @@ const AptitudeTest = () => {
   const [timeLeft, setTimeLeft] = useState(40 * 60);
   const [isSubmitted, setIsSubmitted] = useState(false);
   const [testStarted, setTestStarted] = useState(false);
-  const [isSendingEmail, setIsSendingEmail] = useState(false);
-  const CUTOFF_PERCENTAGE = 75;
-  const [resultMessage, setResultMessage] = useState<string | null>(null);
   const [isRateLimited, setIsRateLimited] = useState(false);
   const [rateLimitMessage, setRateLimitMessage] = useState("");
 
@@ -133,7 +131,6 @@ const AptitudeTest = () => {
     }).join("\n");
   };
 
-  // ✅ UPDATED: compact format with separator lines
   const buildWrongAnswersList = () => {
     const wrongAnswers: string[] = [];
     aptitudeQuestions.forEach((q, index) => {
@@ -154,6 +151,26 @@ const AptitudeTest = () => {
     return wrongAnswers.length > 0
       ? wrongAnswers.join("\n──────────────────\n")
       : "You answered all questions correctly! 🎉";
+  };
+
+  // ── Build structured wrong answers for in-app results page ──
+  const buildWrongAnswersStructured = () => {
+    return aptitudeQuestions
+      .map((q, index) => {
+        const correctIndex = q.correctAnswer - 1;
+        const userAnswer = answers[index];
+        if (userAnswer === null || userAnswer !== correctIndex) {
+          return {
+            questionIndex: index,
+            questionText: q.question,
+            userAnswer: userAnswer === null ? "Not answered" : q.options[userAnswer],
+            correctAnswer: q.options[correctIndex],
+            explanation: q.explanation || "Review this topic further.",
+          };
+        }
+        return null;
+      })
+      .filter(Boolean) as AptitudeResultsState["wrongAnswers"];
   };
 
   const buildPersonalizedResources = () => {
@@ -199,7 +216,58 @@ const AptitudeTest = () => {
       : "🎉 Great job! You performed well across all categories.\n   Keep practicing at: https://www.indiabix.com";
   };
 
-  // ✅ UPDATED: Gmail-safe segmented bar instead of conic-gradient
+  // ── Build structured resources for in-app results page ──
+  const buildResourcesStructured = (): AptitudeResultsState["resources"] => {
+    const stats = analyzeCategoryBreakdown();
+    const resourceMap: { [key: string]: { label: string; url: string }[] } = {
+      "Numerical": [
+        { label: "IndiaBix Quantitative Aptitude", url: "https://www.indiabix.com/aptitude/questions-and-answers/" },
+        { label: "Khan Academy Arithmetic", url: "https://www.khanacademy.org/math/arithmetic" },
+        { label: "Testbook Quantitative", url: "https://testbook.com/quantitative-aptitude" },
+      ],
+      "Logical Reasoning": [
+        { label: "IndiaBix Logical Reasoning", url: "https://www.indiabix.com/logical-reasoning/questions-and-answers/" },
+        { label: "Brilliant.org Logic Puzzles", url: "https://brilliant.org/courses/logic/" },
+        { label: "Testbook Logical Reasoning", url: "https://testbook.com/logical-reasoning" },
+      ],
+      "Verbal": [
+        { label: "IndiaBix Verbal Ability", url: "https://www.indiabix.com/verbal-ability/questions-and-answers/" },
+        { label: "Grammarly Handbook", url: "https://www.grammarly.com/blog/category/handbook/" },
+        { label: "Testbook English", url: "https://testbook.com/english-language" },
+      ],
+      "Technical Aptitude": [
+        { label: "GeeksForGeeks CS Fundamentals", url: "https://www.geeksforgeeks.org/fundamentals-of-algorithms/" },
+        { label: "JavaTPoint Technical", url: "https://www.javatpoint.com/technical-aptitude" },
+        { label: "IndiaBix Technical", url: "https://www.indiabix.com/technical/" },
+      ],
+    };
+
+    const result: AptitudeResultsState["resources"] = [];
+    Object.entries(stats).forEach(([category, data]) => {
+      const pct = (data.correct / data.total) * 100;
+      if (pct < 75) {
+        const key = Object.keys(resourceMap).find(k =>
+          category.toLowerCase().includes(k.toLowerCase()) ||
+          k.toLowerCase().includes(category.toLowerCase())
+        );
+        if (key && resourceMap[key]) {
+          result.push({ category, links: resourceMap[key] });
+        }
+      }
+    });
+
+    if (result.length === 0) {
+      result.push({
+        category: "Keep Sharpening",
+        links: [
+          { label: "IndiaBix Practice", url: "https://www.indiabix.com" },
+          { label: "Testbook Aptitude", url: "https://testbook.com/aptitude" },
+        ],
+      });
+    }
+    return result;
+  };
+
   const buildPieChart = () => {
     const stats = analyzeCategoryBreakdown();
     const entries = Object.entries(stats);
@@ -290,7 +358,6 @@ const AptitudeTest = () => {
     }
 
     setIsSubmitted(true);
-    setIsSendingEmail(true);
 
     const totalQuestions = aptitudeQuestions.length;
     const correctCount = answers.reduce((count, ans, index) => {
@@ -298,10 +365,11 @@ const AptitudeTest = () => {
       return ans === correctIndex ? count + 1 : count;
     }, 0);
     const percentage = totalQuestions === 0 ? 0 : (correctCount / totalQuestions) * 100;
-    const isPassed = percentage >= CUTOFF_PERCENTAGE;
+    const isPassed = percentage >= 75;
 
     const weakAreas = analyzeWeakAreas();
     const categoryBreakdown = buildCategoryBreakdown();
+    const categoryStats = analyzeCategoryBreakdown();
     const wrongAnswersList = buildWrongAnswersList();
     const personalizedResources = buildPersonalizedResources();
     const pieChart = buildPieChart();
@@ -328,60 +396,64 @@ const AptitudeTest = () => {
         setIsRateLimited(true);
         setRateLimitMessage(errorData.message || "Too many attempts. Please wait 1 hour before trying again.");
         setIsSubmitted(false);
-        setIsSendingEmail(false);
         return;
       }
 
       if (userId) await refreshProgress(userId);
 
-      setResultMessage(
-        isPassed
-          ? "Congratulations! You have cleared the Aptitude Round and qualified for the Technical Round 🎉"
-          : "You did not clear the Aptitude Round. Focus on your weak areas and try again 💪"
-      );
+      // ── Navigate to results page immediately ──
+      navigate(`/results/aptitude/${encodeURIComponent(companyName)}`, {
+        state: {
+          companyName,
+          score: correctCount,
+          totalQuestions,
+          percentage,
+          passed: isPassed,
+          categoryStats,
+          wrongAnswers: buildWrongAnswersStructured(),
+          resources: buildResourcesStructured(),
+        } as AptitudeResultsState,
+      });
 
+      // ── Send email in background (non-blocking) ──
       const userName = user?.fullName || "Candidate";
-
-      try {
-        const emailPayload: Record<string, string> = {
-          to_email: email,
-          from_name: "SkillMirror",
-          candidate_name: userName,
-          subject: isPassed
-            ? "SkillMirror Aptitude Test – Qualified for Technical Round"
-            : "SkillMirror Aptitude Test – Performance Analysis",
-          message: isPassed
-            ? `Congratulations! You have cleared the Aptitude Round for ${companyName}.`
-            : `Thank you for taking the Aptitude Test for ${companyName}. Here is your detailed performance analysis.`,
-          score: `${correctCount}/${totalQuestions}`,
-          percentage: percentage.toFixed(2),
-          status: isPassed ? "PASSED" : "FAILED",
-          status_color: isPassed ? "#16a34a" : "#dc2626",
-          status_icon: isPassed ? "✅" : "❌",
-          weak_areas: isPassed
-            ? `All categories passed! 🎉\n\n${categoryBreakdown}`
-            : `${weakAreas.join("\n")}\n\n📊 Full Breakdown:\n${categoryBreakdown}`,
-          next_round: isPassed ? "✅ Technical Round — You are qualified!" : "❌ Not Qualified — Keep practicing!",
-          resources: isPassed
-            ? "🎉 You are eligible for the Technical Round!\n\n🔥 Start preparing:\n   💻 LeetCode: https://leetcode.com\n   📘 GeeksForGeeks: https://www.geeksforgeeks.org\n   🧠 IndiaBix Technical: https://www.indiabix.com/technical/"
-            : personalizedResources,
-          wrong_answers: isPassed ? "You passed! No wrong answers to review." : wrongAnswersList,
-          pie_chart: pieChart,
-        };
-
-        const { default: emailjs } = await import("@emailjs/browser");
-        await emailjs.send("service_qmge4ea", "template_tkihh98", emailPayload, "MMaLzV-Wvmsya4aWx");
-        toast({ title: "Email Sent Successfully", description: `Results sent to ${email}` });
-      } catch (error) {
-        console.error("EmailJS Error:", error);
-        toast({ title: "Email Failed", description: "Email service error. Check EmailJS configuration.", variant: "destructive" });
-      }
+      import("@emailjs/browser").then(({ default: emailjs }) => {
+        emailjs.send(
+          "service_qmge4ea",
+          "template_tkihh98",
+          {
+            to_email: email,
+            from_name: "SkillMirror",
+            candidate_name: userName,
+            subject: isPassed
+              ? "SkillMirror Aptitude Test – Qualified for Technical Round"
+              : "SkillMirror Aptitude Test – Performance Analysis",
+            message: isPassed
+              ? `Congratulations! You have cleared the Aptitude Round for ${companyName}.`
+              : `Thank you for taking the Aptitude Test for ${companyName}. Here is your detailed performance analysis.`,
+            score: `${correctCount}/${totalQuestions}`,
+            percentage: percentage.toFixed(2),
+            status: isPassed ? "PASSED" : "FAILED",
+            status_color: isPassed ? "#16a34a" : "#dc2626",
+            status_icon: isPassed ? "✅" : "❌",
+            weak_areas: isPassed
+              ? `All categories passed! 🎉\n\n${categoryBreakdown}`
+              : `${weakAreas.join("\n")}\n\n📊 Full Breakdown:\n${categoryBreakdown}`,
+            next_round: isPassed ? "✅ Technical Round — You are qualified!" : "❌ Not Qualified — Keep practicing!",
+            resources: isPassed
+              ? "🎉 You are eligible for the Technical Round!\n\n🔥 Start preparing:\n   💻 LeetCode: https://leetcode.com\n   📘 GeeksForGeeks: https://www.geeksforgeeks.org\n   🧠 IndiaBix Technical: https://www.indiabix.com/technical/"
+              : personalizedResources,
+            wrong_answers: isPassed ? "You passed! No wrong answers to review." : wrongAnswersList,
+            pie_chart: pieChart,
+          },
+          "MMaLzV-Wvmsya4aWx"
+        ).catch(err => console.error("EmailJS Error:", err));
+      });
 
     } catch (backendError) {
       console.error("Backend failed:", backendError);
       toast({ title: "Submission Failed", description: "Could not evaluate test. Please try again.", variant: "destructive" });
-    } finally {
-      setIsSendingEmail(false);
+      setIsSubmitted(false);
     }
   };
 
@@ -461,67 +533,6 @@ const AptitudeTest = () => {
     );
   }
 
-  if (isSubmitted) {
-    return (
-      <div className="min-h-screen bg-background flex items-center justify-center p-4">
-        <Card className="max-w-2xl w-full p-8 text-center">
-          <div className="mb-6">
-            <div className="h-20 w-20 rounded-full bg-primary/10 flex items-center justify-center mx-auto mb-4">
-              {isSendingEmail ? (
-                <Mail className="h-10 w-10 text-primary animate-pulse" />
-              ) : (
-                <CheckCircle className="h-10 w-10 text-primary" />
-              )}
-            </div>
-            <h1 className="text-3xl font-bold mb-2">
-              {isSendingEmail ? "Sending Results..." : "Test Completed!"}
-            </h1>
-            <p className="text-muted-foreground">{companyName} - Aptitude Test</p>
-          </div>
-          <div className="space-y-4 mb-8">
-            {isSendingEmail ? (
-              <div className="p-6 bg-primary/5 border border-primary/20 rounded-lg">
-                <p className="text-lg mb-2">Please wait while we process your results</p>
-                <p className="text-muted-foreground">We're sending a detailed analysis to <strong>{email}</strong></p>
-              </div>
-            ) : (
-              <div className="p-6 bg-primary/5 border border-primary/20 rounded-lg space-y-3">
-                <div className="flex items-center justify-center gap-2 mb-3">
-                  <Mail className="h-5 w-5 text-primary" />
-                  <h3 className="text-xl font-semibold">Results Sent!</h3>
-                </div>
-                <p className="text-lg">Your test results and detailed performance analysis have been sent to:</p>
-                <p className="text-xl font-bold text-primary">{email}</p>
-                <div className="mt-4 pt-4 border-t border-border">
-                  <p className="text-sm text-muted-foreground">The email includes:</p>
-                  <ul className="text-sm text-muted-foreground mt-2 space-y-1">
-                    <li>✓ Your complete test score and percentage</li>
-                    <li>✓ Visual score bar and category chart</li>
-                    <li>✓ Score breakdown by category</li>
-                    <li>✓ Weak areas with detailed category analysis</li>
-                    <li>✓ Every wrong question with your answer vs correct answer</li>
-                    <li>✓ Explanation for each wrong answer</li>
-                    <li>✓ Personalized learning resources and recommendations</li>
-                    <li>✓ Next steps based on your performance</li>
-                  </ul>
-                </div>
-              </div>
-            )}
-          </div>
-          {!isSendingEmail && resultMessage && (
-            <div className="mb-6 text-lg font-semibold text-center">{resultMessage}</div>
-          )}
-          {!isSendingEmail && (
-            <div className="flex gap-3 justify-center">
-              <Button onClick={() => navigate("/dashboard")} variant="outline">Back to Dashboard</Button>
-              <Button onClick={() => window.location.reload()}>Retake Test</Button>
-            </div>
-          )}
-        </Card>
-      </div>
-    );
-  }
-
   return (
     <div className="min-h-screen bg-background">
       <header className="bg-card border-b border-border sticky top-0 z-50">
@@ -549,9 +560,9 @@ const AptitudeTest = () => {
                 <Clock className="h-4 w-4" />
                 <span className="font-mono font-semibold">{formatTime(timeLeft)}</span>
               </div>
-              <Button onClick={handleSubmit} size="sm">
+              <Button onClick={handleSubmit} size="sm" disabled={isSubmitted}>
                 <Flag className="h-4 w-4 mr-2" />
-                Submit Test
+                {isSubmitted ? "Submitting..." : "Submit Test"}
               </Button>
             </div>
           </div>

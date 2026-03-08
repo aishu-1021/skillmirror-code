@@ -8,9 +8,10 @@ import Login from "./pages/Login";
 import Register from "./pages/Register";
 import Dashboard from "./pages/Dashboard";
 import AptitudeTest from "./pages/AptitudeTest";
-import NotFound from "./pages/NotFound";
 import TechnicalTest from "./pages/TechnicalTest";
-// Import route guards
+import AptitudeResults from "./pages/AptitudeResults";   // ✅ NEW
+import TechnicalResults from "./pages/TechnicalResults"; // ✅ NEW
+import NotFound from "./pages/NotFound";
 import ProtectedRoute from "./components/ProtectedRoute";
 import PublicRoute from "./components/PublicRoute";
 
@@ -55,6 +56,18 @@ const App = () => (
           </ProtectedRoute>
         } />
 
+        {/* ✅ NEW — Results pages */}
+        <Route path="/results/aptitude/:companyId" element={
+          <ProtectedRoute>
+            <AptitudeResults />
+          </ProtectedRoute>
+        } />
+        <Route path="/results/technical/:companyName" element={
+          <ProtectedRoute>
+            <TechnicalResults />
+          </ProtectedRoute>
+        } />
+
         {/* 404 */}
         <Route path="*" element={<NotFound />} />
       </Routes>
@@ -62,5 +75,4 @@ const App = () => (
     </TooltipProvider>
   </QueryClientProvider>
 );
-
 export default App;

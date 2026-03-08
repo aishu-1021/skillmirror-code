@@ -4,13 +4,14 @@ import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { Card } from "@/components/ui/card";
 import {
-  Target, Clock, ChevronLeft, ChevronRight, Flag, CheckCircle,
+  Target, Clock, ChevronLeft, ChevronRight, Flag,
 } from "lucide-react";
 import { technicalQuestionSets } from "@/data/technicalQuestions";
 import { evaluateTechnical } from "@/api/technicalApi";
 import { Question } from "@/types";
 import { useAuth } from "@/context/AuthContext";
 import { useProgress } from "@/context/ProgressContext";
+import type { TechnicalResultsState } from "./TechnicalResults";
 
 const TECHNICAL_TIME = 20 * 60;
 
@@ -51,8 +52,6 @@ const TechnicalTest = () => {
   const [answers, setAnswers] = useState<(number | null)[]>(new Array(questions.length).fill(null));
   const [timeLeft, setTimeLeft] = useState(TECHNICAL_TIME);
   const [submitted, setSubmitted] = useState(false);
-  const [score, setScore] = useState(0);
-  const [isSendingEmail, setIsSendingEmail] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [isRateLimited, setIsRateLimited] = useState(false);
   const [rateLimitMessage, setRateLimitMessage] = useState("");
@@ -63,7 +62,6 @@ const TechnicalTest = () => {
     setCurrentQuestion(0);
     setTimeLeft(TECHNICAL_TIME);
     setSubmitted(false);
-    setScore(0);
     testStartTimeRef.current = Date.now();
   }, [decodedCompany]);
 
@@ -132,7 +130,6 @@ const TechnicalTest = () => {
     }).join("\n");
   };
 
-  // ✅ UPDATED: compact format with separator lines
   const buildWrongAnswersList = () => {
     const wrongAnswers: string[] = [];
     questions.forEach((q, index) => {
@@ -153,6 +150,26 @@ const TechnicalTest = () => {
     return wrongAnswers.length > 0
       ? wrongAnswers.join("\n──────────────────\n")
       : "You answered all questions correctly! 🎉";
+  };
+
+  // ── Build structured wrong answers for in-app results page ──
+  const buildWrongAnswersStructured = (): TechnicalResultsState["wrongAnswers"] => {
+    return questions
+      .map((q, index) => {
+        const correctIndex = q.correctAnswer - 1;
+        const userAnswer = answers[index];
+        if (userAnswer === null || userAnswer !== correctIndex) {
+          return {
+            questionIndex: index,
+            questionText: q.question,
+            userAnswer: userAnswer === null ? "Not answered" : q.options[userAnswer],
+            correctAnswer: q.options[correctIndex],
+            explanation: q.explanation || "Review this topic further.",
+          };
+        }
+        return null;
+      })
+      .filter(Boolean) as TechnicalResultsState["wrongAnswers"];
   };
 
   const buildPersonalizedResources = () => {
@@ -210,7 +227,71 @@ const TechnicalTest = () => {
       : "🎉 Excellent! You performed well across all topics.\n   Keep sharpening at: https://neetcode.io/roadmap";
   };
 
-  // ✅ UPDATED: Gmail-safe segmented bar instead of conic-gradient
+  // ── Build structured resources for in-app results page ──
+  const buildResourcesStructured = (): TechnicalResultsState["resources"] => {
+    const stats = analyzeCategoryBreakdown();
+    const resourceMap: { [key: string]: { label: string; url: string }[] } = {
+      "Algorithms": [
+        { label: "NeetCode Roadmap", url: "https://neetcode.io/roadmap" },
+        { label: "LeetCode Algorithms", url: "https://leetcode.com/explore/learn/" },
+        { label: "GeeksForGeeks Algorithms", url: "https://www.geeksforgeeks.org/fundamentals-of-algorithms/" },
+      ],
+      "Data Structures": [
+        { label: "NeetCode Data Structures", url: "https://neetcode.io/roadmap" },
+        { label: "GeeksForGeeks DSA", url: "https://www.geeksforgeeks.org/data-structures/" },
+        { label: "Visualgo (Visual DSA)", url: "https://visualgo.net/en" },
+      ],
+      "System Design": [
+        { label: "System Design Primer", url: "https://github.com/donnemartin/system-design-primer" },
+        { label: "Grokking System Design", url: "https://www.designgurus.io/course/grokking-the-system-design-interview" },
+        { label: "Gaurav Sen YouTube", url: "https://www.youtube.com/@gkcs" },
+      ],
+      "Operating Systems": [
+        { label: "OS Concepts - GeeksForGeeks", url: "https://www.geeksforgeeks.org/operating-systems/" },
+        { label: "OSTEP (Free OS Book)", url: "https://pages.cs.wisc.edu/~remzi/OSTEP/" },
+        { label: "Gate Smashers OS", url: "https://www.youtube.com/@GateSmashers" },
+      ],
+      "Databases": [
+        { label: "SQLZoo Practice", url: "https://sqlzoo.net/" },
+        { label: "GeeksForGeeks DBMS", url: "https://www.geeksforgeeks.org/dbms/" },
+        { label: "CMU Database Course", url: "https://15445.courses.cs.cmu.edu/" },
+      ],
+      "OOP": [
+        { label: "GeeksForGeeks OOP", url: "https://www.geeksforgeeks.org/object-oriented-programming-oops-concept-in-java/" },
+        { label: "Java OOP - JavaTPoint", url: "https://www.javatpoint.com/java-oops-concepts" },
+        { label: "Refactoring Guru (Design Patterns)", url: "https://refactoring.guru/design-patterns" },
+      ],
+      "General CS": [
+        { label: "CS50 (Free Harvard Course)", url: "https://cs50.harvard.edu/" },
+        { label: "GeeksForGeeks CS Subjects", url: "https://www.geeksforgeeks.org/computer-science-subjects/" },
+        { label: "InterviewBit CS Fundamentals", url: "https://www.interviewbit.com/courses/programming/" },
+      ],
+    };
+
+    const result: TechnicalResultsState["resources"] = [];
+    Object.entries(stats).forEach(([category, data]) => {
+      const pct = (data.correct / data.total) * 100;
+      if (pct < 75) {
+        const key = Object.keys(resourceMap).find(k => category.toLowerCase() === k.toLowerCase());
+        if (key && resourceMap[key]) {
+          result.push({ category, links: resourceMap[key] });
+        }
+      }
+    });
+
+    if (result.length === 0) {
+      result.push({
+        category: "Keep Sharpening",
+        links: [
+          { label: "NeetCode Roadmap", url: "https://neetcode.io/roadmap" },
+          { label: "LeetCode", url: "https://leetcode.com" },
+          { label: "System Design Primer", url: "https://github.com/donnemartin/system-design-primer" },
+        ],
+      });
+    }
+    return result;
+  };
+
   const buildPieChart = () => {
     const stats = analyzeCategoryBreakdown();
     const entries = Object.entries(stats);
@@ -294,7 +375,6 @@ const TechnicalTest = () => {
     addPracticeTime(secondsSpent, userId);
 
     setSubmitting(true);
-    setIsSendingEmail(true);
 
     const responses = questions.map((q, index) => {
       const correctIndex = q.correctAnswer - 1;
@@ -318,15 +398,12 @@ const TechnicalTest = () => {
         setIsRateLimited(true);
         setRateLimitMessage(errorData.message || "Too many attempts. Please wait 1 hour before trying again.");
         setSubmitting(false);
-        setIsSendingEmail(false);
         return;
       }
 
       if (!res.ok) throw new Error("Backend evaluation failed");
 
       const result = await res.json();
-
-      setScore(Number(result.percentage.toFixed(2)));
       setSubmitted(true);
 
       if (user) {
@@ -338,8 +415,7 @@ const TechnicalTest = () => {
       }
       await refreshProgress(userId);
 
-      if (result.interviewUnlocked) navigate("/dashboard");
-
+      const categoryStats = analyzeCategoryBreakdown();
       const weakAreas = analyzeWeakAreas();
       const categoryBreakdown = buildCategoryBreakdown();
       const wrongAnswersList = buildWrongAnswersList();
@@ -348,42 +424,57 @@ const TechnicalTest = () => {
       const userName = user?.fullName || "Candidate";
       const isPassed = result.passed;
 
-      const { default: emailjs } = await import("@emailjs/browser");
-      await emailjs.send(
-        "service_qmge4ea",
-        "template_tkihh98",
-        {
-          to_email: email,
-          from_name: "SkillMirror",
-          candidate_name: userName,
-          subject: isPassed
-            ? "SkillMirror Technical Round – Qualified for Interview Round"
-            : "SkillMirror Technical Round – Performance Analysis",
-          message: isPassed
-            ? `Congratulations! You cleared the Technical Round for ${decodedCompany}.`
-            : `Thank you for attempting the Technical Round for ${decodedCompany}. Here is your detailed performance analysis.`,
-          score: `${result.correct}/${result.total}`,
-          percentage: result.percentage.toFixed(2),
-          status: isPassed ? "PASSED" : "FAILED",
-          status_color: isPassed ? "#16a34a" : "#dc2626",
-          status_icon: isPassed ? "✅" : "❌",
-          weak_areas: isPassed
-            ? `All categories passed! 🎉\n\n${categoryBreakdown}`
-            : `${weakAreas.join("\n")}\n\n📊 Full Breakdown:\n${categoryBreakdown}`,
-          next_round: isPassed ? "✅ Interview Round — You are qualified!" : "❌ Not Qualified — Keep practicing!",
-          resources: isPassed
-            ? "🎉 You are eligible for the Interview Round!\n\n🔥 Keep your skills sharp:\n   💼 LeetCode: https://leetcode.com\n   🗺️ NeetCode Roadmap: https://neetcode.io/roadmap\n   🏗️ System Design Primer: https://github.com/donnemartin/system-design-primer"
-            : personalizedResources,
-          wrong_answers: isPassed ? "You passed! No wrong answers to review." : wrongAnswersList,
-          pie_chart: pieChart,
-        },
-        "MMaLzV-Wvmsya4aWx"
-      );
+      // ── Navigate to results page immediately ──
+      navigate(`/results/technical/${encodeURIComponent(decodedCompany)}`, {
+        state: {
+          companyName: decodedCompany,
+          score: result.correct,
+          totalQuestions: result.total,
+          percentage: result.percentage,
+          passed: isPassed,
+          interviewUnlocked: result.interviewUnlocked || false,
+          categoryStats,
+          wrongAnswers: buildWrongAnswersStructured(),
+          resources: buildResourcesStructured(),
+        } as TechnicalResultsState,
+      });
+
+      // ── Send email in background (non-blocking) ──
+      import("@emailjs/browser").then(({ default: emailjs }) => {
+        emailjs.send(
+          "service_qmge4ea",
+          "template_tkihh98",
+          {
+            to_email: email,
+            from_name: "SkillMirror",
+            candidate_name: userName,
+            subject: isPassed
+              ? "SkillMirror Technical Round – Qualified for Interview Round"
+              : "SkillMirror Technical Round – Performance Analysis",
+            message: isPassed
+              ? `Congratulations! You cleared the Technical Round for ${decodedCompany}.`
+              : `Thank you for attempting the Technical Round for ${decodedCompany}. Here is your detailed performance analysis.`,
+            score: `${result.correct}/${result.total}`,
+            percentage: result.percentage.toFixed(2),
+            status: isPassed ? "PASSED" : "FAILED",
+            status_color: isPassed ? "#16a34a" : "#dc2626",
+            status_icon: isPassed ? "✅" : "❌",
+            weak_areas: isPassed
+              ? `All categories passed! 🎉\n\n${categoryBreakdown}`
+              : `${weakAreas.join("\n")}\n\n📊 Full Breakdown:\n${categoryBreakdown}`,
+            next_round: isPassed ? "✅ Interview Round — You are qualified!" : "❌ Not Qualified — Keep practicing!",
+            resources: isPassed
+              ? "🎉 You are eligible for the Interview Round!\n\n🔥 Keep your skills sharp:\n   💼 LeetCode: https://leetcode.com\n   🗺️ NeetCode Roadmap: https://neetcode.io/roadmap\n   🏗️ System Design Primer: https://github.com/donnemartin/system-design-primer"
+              : personalizedResources,
+            wrong_answers: isPassed ? "You passed! No wrong answers to review." : wrongAnswersList,
+            pie_chart: pieChart,
+          },
+          "MMaLzV-Wvmsya4aWx"
+        ).catch(err => console.error("EmailJS Error:", err));
+      });
 
     } catch (err) {
       console.error(err);
-    } finally {
-      setIsSendingEmail(false);
       setSubmitting(false);
     }
   };
@@ -407,37 +498,6 @@ const TechnicalTest = () => {
             <p className="text-muted-foreground">{rateLimitMessage}</p>
           </div>
           <Button onClick={() => navigate("/dashboard")} className="w-full">Back to Dashboard</Button>
-        </Card>
-      </div>
-    );
-  }
-
-  if (submitted) {
-    return (
-      <div className="min-h-screen bg-background flex items-center justify-center p-4">
-        <Card className="max-w-xl w-full p-8 text-center">
-          <div className="mb-6">
-            <div className="h-20 w-20 rounded-full bg-primary/10 flex items-center justify-center mx-auto mb-4">
-              <CheckCircle className="h-10 w-10 text-primary" />
-            </div>
-            <h1 className="text-3xl font-bold mb-2">Technical Round Completed</h1>
-            <p className="text-muted-foreground">{decodedCompany} – Technical Test</p>
-          </div>
-          <div className="p-6 bg-primary/5 border border-primary/20 rounded-lg mb-6">
-            <p className="text-lg font-semibold">Your Score: {score}%</p>
-            <p className="text-sm text-muted-foreground mt-2">
-              ({Math.round((score / 100) * questions.length)} / {questions.length} correct)
-            </p>
-            {isSendingEmail && (
-              <p className="text-sm text-muted-foreground mt-2 animate-pulse">
-                Sending results to {email}...
-              </p>
-            )}
-          </div>
-          <div className="flex gap-3 justify-center">
-            <Button variant="outline" onClick={() => navigate("/dashboard")}>Back to Dashboard</Button>
-            <Button onClick={() => navigate(0)}>Retake Test</Button>
-          </div>
         </Card>
       </div>
     );
