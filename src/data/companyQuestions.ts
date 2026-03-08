@@ -421,7 +421,7 @@ export const companyQuestionSets: { [key: string]: Question[] } = {
     },
     {
       id: 22,
-      question: " Which comes next?  AB, CD, EF, GH, ?",
+      question: "   Which comes next?  AB, CD, EF, GH, ?",
       options: ["IJ", "KL", "MN", "HI"],
       correctAnswer: 1,
       category: "Logical Reasoning",
