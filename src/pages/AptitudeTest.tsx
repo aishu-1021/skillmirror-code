@@ -343,6 +343,179 @@ const AptitudeTest = () => {
     `;
   };
 
+  // ── PASS EMAIL ──────────────────────────────────────────────────────────────
+  const buildPassEmailContent = (
+    candidateName: string, score: number, total: number,
+    pct: number, company: string, nextRound: string, resources: string
+  ): string => {
+    const stats = analyzeCategoryBreakdown();
+    const strong = Object.entries(stats)
+      .filter(([, d]) => Math.round((d.correct / d.total) * 100) >= 75)
+      .map(([cat, d]) => `${cat} — ${d.correct}/${d.total} (${Math.round((d.correct/d.total)*100)}%)`)
+      .join("<br/>");
+    const bar = `
+      <table width="100%" cellpadding="0" cellspacing="0">
+        <tr><td style="background:#e5e7eb;border-radius:999px;height:16px;overflow:hidden;">
+          <table width="${pct.toFixed(0)}%" cellpadding="0" cellspacing="0">
+            <tr><td style="background:#16a34a;height:16px;border-radius:999px;">&nbsp;</td></tr>
+          </table>
+        </td></tr>
+      </table>
+      <table width="100%" cellpadding="0" cellspacing="0" style="margin-top:8px;">
+        <tr>
+          <td style="font-size:11px;color:#9ca3af;">0%</td>
+          <td style="text-align:center;"><span style="font-size:18px;font-weight:800;color:#16a34a;">${pct.toFixed(1)}%</span></td>
+          <td style="text-align:right;font-size:11px;color:#9ca3af;">100%</td>
+        </tr>
+      </table>
+      <table width="100%" cellpadding="0" cellspacing="0" style="margin-top:4px;">
+        <tr>
+          <td width="75%" style="border-right:2px dashed #d1d5db;padding-right:4px;text-align:right;font-size:10px;color:#9ca3af;">Pass mark: 75%</td>
+          <td style="padding-left:6px;font-size:10px;color:#9ca3af;">&#9650;</td>
+        </tr>
+      </table>`;
+    return `
+      <tr><td style="padding:32px 40px 10px;">
+        <p style="margin:0;font-size:16px;color:#374151;">Hello ${candidateName},</p>
+        <p style="margin:12px 0 0;font-size:15px;color:#6b7280;line-height:1.7;">
+          Congratulations — you have cleared the <strong>${company}</strong> Aptitude Round
+          and qualified for the <strong>${nextRound}</strong>.
+        </p>
+      </td></tr>
+      <tr><td style="padding:20px 40px 10px;">
+        <table width="100%" cellpadding="0" cellspacing="0"
+          style="background:linear-gradient(135deg,#f0fdf4,#dcfce7);border-radius:12px;border:1px solid #bbf7d0;">
+          <tr><td style="padding:28px;text-align:center;">
+            <p style="margin:0;font-size:12px;text-transform:uppercase;letter-spacing:1px;color:#15803d;font-weight:700;">Your Score</p>
+            <p style="margin:8px 0;font-size:56px;font-weight:900;color:#14532d;line-height:1;">${score}/${total}</p>
+            <p style="margin:0;font-size:24px;font-weight:800;color:#16a34a;">${pct.toFixed(1)}%</p>
+            <div style="margin-top:14px;">
+              <span style="display:inline-block;padding:8px 32px;border-radius:50px;background:#16a34a;color:#ffffff;font-size:14px;font-weight:800;letter-spacing:2px;">PASSED</span>
+            </div>
+          </td></tr>
+        </table>
+      </td></tr>
+      <tr><td style="padding:8px 40px 20px;">
+        <table width="100%" cellpadding="0" cellspacing="0" style="background:#f8fafc;border-radius:10px;border:1px solid #e5e7eb;">
+          <tr><td style="padding:16px 24px;">${bar}</td></tr>
+        </table>
+      </td></tr>
+      <tr><td style="padding:0 40px;"><hr style="border:none;border-top:1px solid #e5e7eb;margin:0;"/></td></tr>
+      <tr><td style="padding:28px 40px;">
+        <p style="margin:0 0 14px;font-size:13px;font-weight:800;color:#374151;text-transform:uppercase;letter-spacing:1px;border-bottom:1px solid #e5e7eb;padding-bottom:10px;">Performance Breakdown</p>
+        ${buildPieChart()}
+      </td></tr>
+      <tr><td style="padding:0 40px;"><hr style="border:none;border-top:1px solid #e5e7eb;margin:0;"/></td></tr>
+      <tr><td style="padding:28px 40px;">
+        <p style="margin:0 0 14px;font-size:13px;font-weight:800;color:#374151;text-transform:uppercase;letter-spacing:1px;border-bottom:1px solid #e5e7eb;padding-bottom:10px;">What You Did Well</p>
+        <div style="background:linear-gradient(135deg,#f0fdf4,#f7fef9);border:1px solid #bbf7d0;border-left:4px solid #16a34a;border-radius:6px;padding:18px;">
+          <p style="margin:0;font-size:13px;color:#14532d;line-height:2;">${strong || "All categories — excellent performance."}</p>
+        </div>
+      </td></tr>
+      <tr><td style="padding:0 40px;"><hr style="border:none;border-top:1px solid #e5e7eb;margin:0;"/></td></tr>
+      <tr><td style="padding:28px 40px;">
+        <p style="margin:0 0 14px;font-size:13px;font-weight:800;color:#374151;text-transform:uppercase;letter-spacing:1px;border-bottom:1px solid #e5e7eb;padding-bottom:10px;">Next Step</p>
+        <div style="background:linear-gradient(135deg,#eff6ff,#e0f2fe);border:1px solid #bfdbfe;border-left:4px solid #2563eb;border-radius:6px;padding:18px;">
+          <p style="margin:0;font-size:15px;color:#1e40af;font-weight:700;">${nextRound} — You are qualified.</p>
+          <p style="margin:8px 0 0;font-size:13px;color:#3b82f6;line-height:1.6;">Head to your dashboard to begin. Each round is harder — prepare well.</p>
+        </div>
+      </td></tr>
+      <tr><td style="padding:0 40px;"><hr style="border:none;border-top:1px solid #e5e7eb;margin:0;"/></td></tr>
+      <tr><td style="padding:28px 40px 36px;">
+        <p style="margin:0 0 14px;font-size:13px;font-weight:800;color:#374151;text-transform:uppercase;letter-spacing:1px;border-bottom:1px solid #e5e7eb;padding-bottom:10px;">Preparation Resources</p>
+        <div style="background:linear-gradient(135deg,#f5f3ff,#ede9fe);border:1px solid #ddd6fe;border-left:4px solid #7c3aed;border-radius:6px;padding:18px;">
+          <p style="margin:0;font-size:13px;color:#5b21b6;line-height:2.2;white-space:pre-line;">${resources}</p>
+        </div>
+      </td></tr>`;
+  };
+
+  // ── FAIL EMAIL ───────────────────────────────────────────────────────────────
+  const buildFailEmailContent = (
+    candidateName: string, score: number, total: number,
+    pct: number, company: string,
+    wrongAnswersList: string, weakAreas: string[], resources: string
+  ): string => {
+    const categoryBreakdown = buildCategoryBreakdown();
+    const bar = `
+      <table width="100%" cellpadding="0" cellspacing="0">
+        <tr><td style="background:#e5e7eb;border-radius:999px;height:16px;overflow:hidden;">
+          <table width="${pct.toFixed(0)}%" cellpadding="0" cellspacing="0">
+            <tr><td style="background:#dc2626;height:16px;border-radius:999px;">&nbsp;</td></tr>
+          </table>
+        </td></tr>
+      </table>
+      <table width="100%" cellpadding="0" cellspacing="0" style="margin-top:8px;">
+        <tr>
+          <td style="font-size:11px;color:#9ca3af;">0%</td>
+          <td style="text-align:center;"><span style="font-size:18px;font-weight:800;color:#dc2626;">${pct.toFixed(1)}%</span></td>
+          <td style="text-align:right;font-size:11px;color:#9ca3af;">100%</td>
+        </tr>
+      </table>
+      <table width="100%" cellpadding="0" cellspacing="0" style="margin-top:4px;">
+        <tr>
+          <td width="75%" style="border-right:2px dashed #d1d5db;padding-right:4px;text-align:right;font-size:10px;color:#9ca3af;">Pass mark: 75%</td>
+          <td style="padding-left:6px;font-size:10px;color:#9ca3af;">&#9650;</td>
+        </tr>
+      </table>`;
+    return `
+      <tr><td style="padding:32px 40px 10px;">
+        <p style="margin:0;font-size:16px;color:#374151;">Hello ${candidateName},</p>
+        <p style="margin:12px 0 0;font-size:15px;color:#6b7280;line-height:1.7;">
+          Thank you for attempting the <strong>${company}</strong> Aptitude Round.
+          You did not clear this round — but this report will help you understand exactly what to work on.
+        </p>
+      </td></tr>
+      <tr><td style="padding:20px 40px 10px;">
+        <table width="100%" cellpadding="0" cellspacing="0"
+          style="background:linear-gradient(135deg,#fef2f2,#fff5f5);border-radius:12px;border:1px solid #fecaca;">
+          <tr><td style="padding:28px;text-align:center;">
+            <p style="margin:0;font-size:12px;text-transform:uppercase;letter-spacing:1px;color:#991b1b;font-weight:700;">Your Score</p>
+            <p style="margin:8px 0;font-size:56px;font-weight:900;color:#7f1d1d;line-height:1;">${score}/${total}</p>
+            <p style="margin:0;font-size:24px;font-weight:800;color:#dc2626;">${pct.toFixed(1)}%</p>
+            <div style="margin-top:14px;">
+              <span style="display:inline-block;padding:8px 32px;border-radius:50px;background:#dc2626;color:#ffffff;font-size:14px;font-weight:800;letter-spacing:2px;">NOT PASSED</span>
+            </div>
+          </td></tr>
+        </table>
+      </td></tr>
+      <tr><td style="padding:8px 40px 20px;">
+        <table width="100%" cellpadding="0" cellspacing="0" style="background:#f8fafc;border-radius:10px;border:1px solid #e5e7eb;">
+          <tr><td style="padding:16px 24px;">${bar}</td></tr>
+        </table>
+      </td></tr>
+      <tr><td style="padding:0 40px;"><hr style="border:none;border-top:1px solid #e5e7eb;margin:0;"/></td></tr>
+      <tr><td style="padding:28px 40px;">
+        <p style="margin:0 0 14px;font-size:13px;font-weight:800;color:#374151;text-transform:uppercase;letter-spacing:1px;border-bottom:1px solid #e5e7eb;padding-bottom:10px;">Performance Breakdown</p>
+        ${buildPieChart()}
+        <div style="background:linear-gradient(135deg,#fffbeb,#fefce8);border:1px solid #fde68a;border-left:4px solid #d97706;border-radius:6px;padding:16px;margin-top:14px;">
+          <p style="margin:0;font-size:13px;color:#92400e;line-height:2;white-space:pre-line;">${categoryBreakdown}</p>
+        </div>
+      </td></tr>
+      <tr><td style="padding:0 40px;"><hr style="border:none;border-top:1px solid #e5e7eb;margin:0;"/></td></tr>
+      <tr><td style="padding:28px 40px;">
+        <p style="margin:0 0 14px;font-size:13px;font-weight:800;color:#374151;text-transform:uppercase;letter-spacing:1px;border-bottom:1px solid #e5e7eb;padding-bottom:10px;">Areas to Focus On</p>
+        <div style="background:linear-gradient(135deg,#fff7ed,#fff4e6);border:1px solid #fed7aa;border-left:4px solid #ea580c;border-radius:6px;padding:16px;">
+          <p style="margin:0;font-size:13px;color:#7c2d12;line-height:2;white-space:pre-line;">${weakAreas.join("\n")}</p>
+        </div>
+      </td></tr>
+      <tr><td style="padding:0 40px;"><hr style="border:none;border-top:1px solid #e5e7eb;margin:0;"/></td></tr>
+      <tr><td style="padding:28px 40px;">
+        <p style="margin:0 0 14px;font-size:13px;font-weight:800;color:#374151;text-transform:uppercase;letter-spacing:1px;border-bottom:1px solid #e5e7eb;padding-bottom:10px;">Questions to Review</p>
+        <div style="background:#fafafa;border:1px solid #e5e7eb;border-radius:10px;padding:18px 20px;">
+          <p style="margin:0;font-size:11.5px;color:#374151;line-height:2;white-space:pre-line;font-family:'Courier New',Courier,monospace;">${wrongAnswersList}</p>
+        </div>
+        <p style="margin:10px 0 0;font-size:11px;color:#9ca3af;text-align:right;">Review each explanation carefully before your next attempt.</p>
+      </td></tr>
+      <tr><td style="padding:0 40px;"><hr style="border:none;border-top:1px solid #e5e7eb;margin:0;"/></td></tr>
+      <tr><td style="padding:28px 40px 36px;">
+        <p style="margin:0 0 14px;font-size:13px;font-weight:800;color:#374151;text-transform:uppercase;letter-spacing:1px;border-bottom:1px solid #e5e7eb;padding-bottom:10px;">Recommended Resources</p>
+        <div style="background:linear-gradient(135deg,#f5f3ff,#ede9fe);border:1px solid #ddd6fe;border-left:4px solid #7c3aed;border-radius:6px;padding:18px;">
+          <p style="margin:0;font-size:13px;color:#5b21b6;line-height:2.2;white-space:pre-line;">${resources}</p>
+        </div>
+        <p style="margin:12px 0 0;font-size:13px;color:#6b7280;text-align:center;">You can retake this round after 1 hour. Use the time to review the topics above.</p>
+      </td></tr>`;
+  };
+
   const handleSubmit = async () => {
     if (isSubmitted) return;
     if (!userId || aptitudeQuestions.length === 0) return;
@@ -418,33 +591,44 @@ const AptitudeTest = () => {
       // ── Send email in background (non-blocking) ──
       const userName = user?.fullName || "Candidate";
       import("@emailjs/browser").then(({ default: emailjs }) => {
+
+        // Build the dynamic main_content block based on pass/fail
+        const passResources =
+          "LeetCode: https://leetcode.com\n" +
+          "GeeksForGeeks: https://www.geeksforgeeks.org\n" +
+          "IndiaBix Technical: https://www.indiabix.com/technical/\n" +
+          "NeetCode Roadmap: https://neetcode.io/roadmap";
+
+        const mainContent = isPassed
+          ? buildPassEmailContent(
+              userName,
+              correctCount,
+              totalQuestions,
+              percentage,
+              companyName,
+              "Technical Round",
+              passResources,
+            )
+          : buildFailEmailContent(
+              userName,
+              correctCount,
+              totalQuestions,
+              percentage,
+              companyName,
+              wrongAnswersList,
+              weakAreas,
+              personalizedResources,
+            );
+
         emailjs.send(
           "service_qmge4ea",
           "template_tkihh98",
           {
             to_email: email,
-            from_name: "SkillMirror",
-            candidate_name: userName,
             subject: isPassed
-              ? "SkillMirror Aptitude Test – Qualified for Technical Round"
-              : "SkillMirror Aptitude Test – Performance Analysis",
-            message: isPassed
-              ? `Congratulations! You have cleared the Aptitude Round for ${companyName}.`
-              : `Thank you for taking the Aptitude Test for ${companyName}. Here is your detailed performance analysis.`,
-            score: `${correctCount}/${totalQuestions}`,
-            percentage: percentage.toFixed(2),
-            status: isPassed ? "PASSED" : "FAILED",
-            status_color: isPassed ? "#16a34a" : "#dc2626",
-            status_icon: isPassed ? "✅" : "❌",
-            weak_areas: isPassed
-              ? `All categories passed! 🎉\n\n${categoryBreakdown}`
-              : `${weakAreas.join("\n")}\n\n📊 Full Breakdown:\n${categoryBreakdown}`,
-            next_round: isPassed ? "✅ Technical Round — You are qualified!" : "❌ Not Qualified — Keep practicing!",
-            resources: isPassed
-              ? "🎉 You are eligible for the Technical Round!\n\n🔥 Start preparing:\n   💻 LeetCode: https://leetcode.com\n   📘 GeeksForGeeks: https://www.geeksforgeeks.org\n   🧠 IndiaBix Technical: https://www.indiabix.com/technical/"
-              : personalizedResources,
-            wrong_answers: isPassed ? "You passed! No wrong answers to review." : wrongAnswersList,
-            pie_chart: pieChart,
+              ? `SkillMirror — ${companyName} Aptitude Round Cleared`
+              : `SkillMirror — ${companyName} Aptitude Round: Performance Report`,
+            main_content: mainContent,
           },
           "MMaLzV-Wvmsya4aWx"
         ).catch(err => console.error("EmailJS Error:", err));
