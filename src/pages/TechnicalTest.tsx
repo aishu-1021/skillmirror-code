@@ -454,6 +454,167 @@ const TechnicalTest = () => {
   };
 
   // ── FAIL EMAIL ───────────────────────────────────────────────────────────────
+  const buildImprovementPlan = (pct: number): string => {
+    const stats = analyzeCategoryBreakdown();
+
+    // Topic checklists per category
+    const topicMap: { [key: string]: string[] } = {
+      "Algorithms": [
+        "Time & Space Complexity (Big O notation)",
+        "Arrays, Two Pointers, Sliding Window",
+        "Binary Search and its variations",
+        "Recursion and Backtracking",
+        "Sorting algorithms (QuickSort, MergeSort)",
+        "Dynamic Programming (memoization, tabulation)",
+        "Greedy algorithms",
+      ],
+      "Data Structures": [
+        "Arrays vs Linked Lists — when to use which",
+        "Stacks and Queues (implementation + use cases)",
+        "HashMaps and HashSets (collision handling)",
+        "Trees — BST, traversals (inorder/preorder/postorder)",
+        "Heaps / Priority Queues",
+        "Graphs — BFS, DFS, adjacency list vs matrix",
+        "Tries (prefix trees)",
+      ],
+      "System Design": [
+        "Horizontal vs Vertical Scaling",
+        "Load Balancers — types and use cases",
+        "Caching strategies (LRU, write-through, write-back)",
+        "Database sharding and replication",
+        "CAP Theorem — consistency vs availability",
+        "Message queues (Kafka, RabbitMQ)",
+        "REST vs gRPC vs GraphQL",
+      ],
+      "Operating Systems": [
+        "Processes vs Threads — differences and lifecycle",
+        "CPU Scheduling algorithms (FCFS, SJF, Round Robin)",
+        "Deadlock — conditions, prevention, detection",
+        "Memory management — paging, segmentation, virtual memory",
+        "Semaphores and Mutexes",
+        "File systems and I/O management",
+      ],
+      "Databases": [
+        "SQL joins — INNER, LEFT, RIGHT, FULL OUTER",
+        "Normalization — 1NF, 2NF, 3NF",
+        "Indexing — B-tree, hash indexes",
+        "ACID properties and transactions",
+        "SQL vs NoSQL — when to use which",
+        "Query optimization basics (EXPLAIN, indexes)",
+      ],
+      "OOP": [
+        "4 pillars — Encapsulation, Abstraction, Inheritance, Polymorphism",
+        "Abstract classes vs Interfaces",
+        "SOLID principles (one by one)",
+        "Common design patterns — Singleton, Factory, Observer",
+        "Method overloading vs overriding",
+        "Composition vs Inheritance",
+      ],
+      "General CS": [
+        "Bit manipulation basics (AND, OR, XOR, shifts)",
+        "Number systems (binary, hex)",
+        "Basic networking — TCP/IP, HTTP, DNS",
+        "Concurrency concepts — race conditions, locks",
+        "Memory — stack vs heap",
+      ],
+      // Aptitude categories
+      "Numerical": [
+        "Percentages, ratios and proportions",
+        "Profit & loss, simple & compound interest",
+        "Time, speed and distance",
+        "Number series and sequences",
+        "Averages, mixtures and alligations",
+      ],
+      "Logical Reasoning": [
+        "Syllogisms and logical deduction",
+        "Blood relations and direction sense",
+        "Coding-decoding patterns",
+        "Seating arrangement problems",
+        "Series completion (number + letter)",
+      ],
+      "Verbal": [
+        "Reading comprehension — main idea, inference",
+        "Sentence correction — grammar rules",
+        "Vocabulary — synonyms, antonyms, analogies",
+        "Para jumbles (sentence rearrangement)",
+        "Critical reasoning — assumptions, conclusions",
+      ],
+      "Technical Aptitude": [
+        "Data structures basics (arrays, stacks, queues)",
+        "Basic algorithm analysis (Big O)",
+        "Networking fundamentals (OSI model, protocols)",
+        "DBMS basics (SQL queries, normalization)",
+        "OOP concepts (classes, inheritance, polymorphism)",
+      ],
+    };
+
+    // Score-based urgency
+    const urgencyBg   = pct < 50 ? "#fef2f2" : "#fff7ed";
+    const urgencyBorder = pct < 50 ? "#fecaca" : "#fed7aa";
+    const urgencyLeft = pct < 50 ? "#dc2626" : "#ea580c";
+    const urgencyText = pct < 50 ? "#7f1d1d" : "#7c2d12";
+    const urgencyTitle = pct < 50
+      ? "Score below 50% — Critical: Dedicate 5–7 days before retaking"
+      : "Score 50–74% — Close: 2–3 focused days should get you there";
+    const urgencyMsg = pct < 50
+      ? "Do not retake immediately. Rushing leads to the same result. Work through each checklist below topic by topic, then retake."
+      : "You are close to the pass mark. Focus only on your weak categories below — you likely just need to fill a few specific gaps.";
+
+    // Build checklist rows only for failed categories
+    const failedCategories = Object.entries(stats).filter(([, d]) => {
+      return Math.round((d.correct / d.total) * 100) < 75;
+    });
+
+    if (failedCategories.length === 0) return "";
+
+    const categoryBlocks = failedCategories.map(([category, data]) => {
+      const scorePct = Math.round((data.correct / data.total) * 100);
+      const topics = topicMap[category] || [`Study ${category} fundamentals`, `Practice ${category} problems on LeetCode/GFG`];
+      const topicRows = topics.map(t =>
+        `<tr><td style="padding:5px 0;font-size:12.5px;color:#374151;line-height:1.5;">
+          <span style="color:#6b7280;margin-right:6px;">&#9744;</span>${t}
+        </td></tr>`
+      ).join("");
+
+      return `
+        <div style="margin-bottom:16px;background:#ffffff;border:1px solid #e5e7eb;
+          border-radius:8px;overflow:hidden;">
+          <div style="background:#f8fafc;padding:10px 16px;border-bottom:1px solid #e5e7eb;">
+            <table width="100%" cellpadding="0" cellspacing="0"><tr>
+              <td style="font-size:13px;font-weight:700;color:#111827;">${category}</td>
+              <td style="text-align:right;font-size:12px;font-weight:700;color:#dc2626;">${scorePct}% — needs work</td>
+            </tr></table>
+          </div>
+          <div style="padding:12px 16px;">
+            <table width="100%" cellpadding="0" cellspacing="0">${topicRows}</table>
+          </div>
+        </div>`;
+    }).join("");
+
+    return `
+      <tr><td style="padding:0 40px;"><hr style="border:none;border-top:1px solid #e5e7eb;margin:0;"/></td></tr>
+      <tr><td style="padding:28px 40px;">
+        <p style="margin:0 0 14px;font-size:13px;font-weight:800;color:#374151;
+          text-transform:uppercase;letter-spacing:1px;border-bottom:1px solid #e5e7eb;padding-bottom:10px;">
+          Your Improvement Plan
+        </p>
+
+        <!-- Urgency banner -->
+        <div style="background:${urgencyBg};border:1px solid ${urgencyBorder};
+          border-left:4px solid ${urgencyLeft};border-radius:6px;padding:14px 16px;margin-bottom:18px;">
+          <p style="margin:0;font-size:13px;font-weight:700;color:${urgencyText};">${urgencyTitle}</p>
+          <p style="margin:6px 0 0;font-size:12px;color:${urgencyText};line-height:1.6;">${urgencyMsg}</p>
+        </div>
+
+        <!-- Per-category topic checklists -->
+        ${categoryBlocks}
+
+        <p style="margin:10px 0 0;font-size:11px;color:#9ca3af;text-align:center;">
+          Tick off each topic as you cover it. Retake when all boxes are checked.
+        </p>
+      </td></tr>`;
+  };
+
   const buildFailEmailContent = (
     candidateName: string, score: number, total: number,
     pct: number, company: string,
@@ -522,6 +683,7 @@ const TechnicalTest = () => {
           <p style="margin:0;font-size:13px;color:#7c2d12;line-height:2;white-space:pre-line;">${weakAreas.join("\n")}</p>
         </div>
       </td></tr>
+      ${buildImprovementPlan(pct)}
       <tr><td style="padding:0 40px;"><hr style="border:none;border-top:1px solid #e5e7eb;margin:0;"/></td></tr>
       <tr><td style="padding:28px 40px;">
         <p style="margin:0 0 14px;font-size:13px;font-weight:800;color:#374151;text-transform:uppercase;letter-spacing:1px;border-bottom:1px solid #e5e7eb;padding-bottom:10px;">Questions to Review</p>
